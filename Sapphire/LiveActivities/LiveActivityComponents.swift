@@ -1063,6 +1063,7 @@ struct EyeBreakPillButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .interactiveCursor(.clickable)
             .font(.subheadline.weight(.semibold))
             .padding(.vertical, 10)
             .background(backgroundColor(for: configuration))
@@ -1166,7 +1167,7 @@ struct UpdateAvailableWidgetView: View {
                 .background(Color.cyan)
                 .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             Text("Updates are installed from the About page in Sapphire's settings.")
                 .font(.caption)
@@ -1343,6 +1344,7 @@ struct ModernNotificationButtonStyle: ButtonStyle {
     var isPrimary: Bool = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .interactiveCursor(.clickable)
             .font(.system(.body, design: .rounded).weight(.semibold))
             .padding(.horizontal, 16).padding(.vertical, 0)
             .foregroundStyle(isPrimary ? .white : .primary.opacity(0.9))
@@ -1476,12 +1478,13 @@ struct NotificationLiveActivityView: View {
         HStack(spacing: 8) {
             TextField("Reply...", text: $replyText)
                 .textFieldStyle(.plain).onSubmit(sendIMessage).focused($isTextFieldFocused)
+                .interactiveCursor(.text)
             Button(action: sendIMessage) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.title3).symbolRenderingMode(.palette)
                     .foregroundStyle(replyText.isEmpty ? Color.secondary : Color.white, replyText.isEmpty ? Color.clear : Color.accentColor)
             }
-            .buttonStyle(.plain).disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .buttonStyle(.sapphireInteractive()).disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 16).frame(height: 40).background(.ultraThinMaterial).clipShape(Capsule())
     }
@@ -1545,7 +1548,7 @@ struct NotificationLiveActivityView: View {
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .contentTransition(.numericText())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .background(didCopyCode ? Color.green.opacity(0.25) : Color.primary.opacity(0.15))
                 .foregroundStyle(didCopyCode ? .green : .primary)
                 .clipShape(Capsule())
@@ -1580,7 +1583,7 @@ struct NotificationLiveActivityView: View {
                 .font(.system(size: 13, weight: .medium))
                 .padding(.horizontal, 12).padding(.vertical, 8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .background(isPrimary ? Color.accentColor.opacity(0.8) : Color.primary.opacity(0.15))
         .foregroundStyle(isPrimary ? .white : .primary)
         .clipShape(Capsule())
@@ -1600,7 +1603,7 @@ struct AudioMessageView: View {
             }
             .padding(.horizontal, 16).frame(height: 50).frame(maxWidth: .infinity).background(.regularMaterial).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain).disabled(playbackState != .idle).animation(.spring, value: playbackState)
+        .buttonStyle(.sapphireInteractive()).disabled(playbackState != .idle).animation(.spring, value: playbackState)
     }
 }
 
@@ -1756,7 +1759,7 @@ struct CalibrationActivityView: View {
                     .background(.white.opacity(0.1))
                     .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .padding(.vertical, 15)
         .padding(.horizontal, 25)
@@ -1837,7 +1840,7 @@ struct OTPLiveActivityView: View {
                         .background(Color.white.opacity(0.08))
                         .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -1883,7 +1886,7 @@ struct OTPLiveActivityView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .background(didCopy ? seedColor.opacity(0.35) : Color.white.opacity(0.08))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1946,7 +1949,7 @@ struct ParcelLiveActivityView: View {
                     Button("Track") {
                         NSWorkspace.shared.open(url)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .font(.system(size: 13, weight: .semibold))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)

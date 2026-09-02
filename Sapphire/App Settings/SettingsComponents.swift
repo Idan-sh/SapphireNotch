@@ -328,7 +328,7 @@ struct FavoriteEntriesEditor: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .disabled(entries.count <= 1)
                     }
                 }
@@ -339,7 +339,7 @@ struct FavoriteEntriesEditor: View {
                     } label: {
                         Label("Add", systemImage: "plus.circle.fill")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
         }
@@ -437,6 +437,7 @@ struct ReorderableVStack<Item: Identifiable & Equatable, Content: View>: View {
                     .opacity(draggingIndex == index ? 0.75 : 1)
                     .zIndex(draggingIndex == index ? 1 : 0)
                     .contentShape(Rectangle())
+                    .interactiveCursor(.draggable)
                     .gesture(
                         DragGesture(minimumDistance: 10, coordinateSpace: .global)
                             .onChanged { value in
@@ -517,6 +518,7 @@ struct CustomBatterySlider: View {
                     )
                     .position(x: thumbX, y: geometry.size.height / 2)
             }
+            .interactiveCursor(.resizeHorizontal)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gestureValue in

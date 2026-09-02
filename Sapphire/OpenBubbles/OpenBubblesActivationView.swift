@@ -14,6 +14,7 @@ import SwiftProtobuf
 struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .interactiveCursor(.clickable)
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -146,7 +147,7 @@ struct OpenBubblesActivationView: View {
                     Text("Your One-Time Code:").font(.caption)
                     HStack {
                         TextField("Activation Code", text: .constant(code)).textFieldStyle(.plain).disabled(true)
-                        Button(action: { copyToClipboard(code) }) { Image(systemName: "doc.on.doc.fill") }.buttonStyle(.plain)
+                        Button(action: { copyToClipboard(code) }) { Image(systemName: "doc.on.doc.fill") }.buttonStyle(.sapphireInteractive())
                     }.padding(8).background(Color.black.opacity(0.25)).clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
@@ -154,7 +155,7 @@ struct OpenBubblesActivationView: View {
                 Text(buttonTitle).fontWeight(.semibold).frame(maxWidth: .infinity).padding(10)
                     .background(buttonState == .processing ? Color.gray.gradient : Color.accentColor.gradient)
                     .foregroundColor(.white).cornerRadius(8)
-            }.buttonStyle(.plain).disabled(buttonState == .processing || identifiers == nil)
+            }.buttonStyle(.sapphireInteractive()).disabled(buttonState == .processing || identifiers == nil)
         }.transition(.opacity.combined(with: .move(edge: .top)))
     }
 
@@ -168,7 +169,7 @@ struct OpenBubblesActivationView: View {
             if let code = defaultActivationCode {
                 HStack {
                     TextField("Activation Code", text: .constant(code)).textFieldStyle(.plain).disabled(true)
-                    Button(action: { copyToClipboard(code) }) { Image(systemName: "doc.on.doc.fill") }.buttonStyle(.plain)
+                    Button(action: { copyToClipboard(code) }) { Image(systemName: "doc.on.doc.fill") }.buttonStyle(.sapphireInteractive())
                 }.padding(8).background(Color.black.opacity(0.25)).clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 ProgressView().frame(height: 30)

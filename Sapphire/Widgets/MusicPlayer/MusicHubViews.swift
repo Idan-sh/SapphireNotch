@@ -156,7 +156,7 @@ struct QueueAndPlaylistsView: View {
                                 )
                                 .foregroundStyle(selection == pane.rawValue ? MaterialChartPalette.primary : MaterialChartPalette.onSurfaceVariant)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                     }
 
                     if hubPane == .audio {
@@ -189,7 +189,7 @@ struct QueueAndPlaylistsView: View {
                                             : MaterialChartPalette.onSurfaceVariant
                                     )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                         }
                     }
                 }
@@ -339,7 +339,7 @@ struct QueueAndPlaylistsView: View {
                         .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary.opacity(0.9))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
         }
         .padding(.horizontal, 9)
@@ -384,7 +384,7 @@ struct QueueAndPlaylistsView: View {
                         .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary.opacity(0.9))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
         }
         .padding(.horizontal, 9)
@@ -542,7 +542,7 @@ struct QueueAndPlaylistsView: View {
                                     .font(.system(size: 13))
                                     .foregroundStyle(musicManager.isLiked ? Color.pink : Color.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                             .help(musicManager.isLiked ? "Unlike" : "Love this song")
 
                             Button {
@@ -555,7 +555,7 @@ struct QueueAndPlaylistsView: View {
                                     .font(.system(size: 12))
                                     .foregroundStyle(musicManager.shuffleState ? musicManager.accentColor : Color.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                             .help("Shuffle")
 
                             Button {
@@ -568,7 +568,7 @@ struct QueueAndPlaylistsView: View {
                                     .font(.system(size: 12))
                                     .foregroundStyle(musicManager.repeatState != .off ? musicManager.accentColor : Color.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                             .help("Repeat")
 
                             Spacer(minLength: 0)
@@ -584,7 +584,7 @@ struct QueueAndPlaylistsView: View {
                                 }
                                 .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                             .help("Show in Apple Music")
                         }
                     }
@@ -635,7 +635,7 @@ struct QueueAndPlaylistsView: View {
                                     }
                                     .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                             }
                         }
                         .padding(.bottom, 12)
@@ -770,7 +770,7 @@ struct QueueAndPlaylistsView: View {
                                                         .padding(.horizontal, 10)
                                                         .padding(.vertical, 8)
                                                     }
-                                                    .buttonStyle(.plain)
+                                                    .buttonStyle(.sapphireInteractive())
                                                 }
                                             }
                                             .padding(.leading, 2)
@@ -861,7 +861,7 @@ struct QueueAndPlaylistsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .disabled(musicManager.currentSpotifyArtistNavigation() == nil
                           && (nowPlaying.metadata?.artistUri?.isEmpty ?? true))
             }
@@ -897,7 +897,7 @@ struct QueueAndPlaylistsView: View {
                                 }
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                     }
 
                     HStack(spacing: 10) {
@@ -1099,7 +1099,7 @@ struct QueueAndPlaylistsView: View {
                             .background(MaterialChartPalette.primary.opacity(0.18), in: Capsule())
                             .foregroundStyle(MaterialChartPalette.primary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
             .padding(.horizontal, 4)
@@ -1218,7 +1218,7 @@ struct QueueAndPlaylistsView: View {
                                                 }
                                             }
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.sapphireInteractive())
                                         .contentShape(Rectangle())
                                         .contextMenu {
                                             Button("Play") {
@@ -1566,7 +1566,7 @@ struct ActionButtonsView: View {
             }
             .font(.system(size: 14))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -1581,7 +1581,7 @@ struct TabButton: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .background(isSelected ? Color.accentColor : Color.white.opacity(0.08))
         .foregroundColor(isSelected ? .white : .primary).clipShape(Capsule())
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
@@ -1625,7 +1625,7 @@ struct TrackHoverActionsView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary.opacity(0.85))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .help("Add to Playlist")
             .popover(isPresented: $showingPlaylistMenu) {
                 AddToPlaylistMenuView(
@@ -1657,7 +1657,7 @@ struct TrackHoverActionsView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary.opacity(0.85))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .help("Add to Queue")
         }
     }
@@ -1837,7 +1837,7 @@ struct AddToPlaylistMenuView: View {
             .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 
     private func showFeedback(_ message: String) {
@@ -1890,7 +1890,7 @@ struct NativeQueueTrackRow: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             TrackHoverActionsView(
                 trackURI: track.uri,
@@ -1909,7 +1909,7 @@ struct NativeQueueTrackRow: View {
                     .font(.system(size: 15))
                     .foregroundStyle(isHovered ? MaterialChartPalette.error : .secondary.opacity(0.55))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .help("Remove from queue")
         }
         .padding(.vertical, 7)
@@ -1968,7 +1968,7 @@ struct QueueTrackRow: View {
         .padding(.horizontal, 10)        .background(Color.white.opacity(isHovered ? 0.15 : 0.1)).cornerRadius(10)
         .contentShape(Rectangle())
         .onHover { hovering in self.isHovered = hovering }
-        .onTapGesture { Task { onPlay(await musicManager.play(trackUri: track.uri, contextUri: nil, trackUid: nil, trackIndex: nil)) }}
+        .interactiveCursor(.clickable).onTapGesture { Task { onPlay(await musicManager.play(trackUri: track.uri, contextUri: nil, trackUid: nil, trackIndex: nil)) }}
         .animation(.easeInOut(duration: 0.15), value: isHovered)
 
     }
@@ -1999,7 +1999,7 @@ struct FullPlaylistRow: View {
         .background(Color.white.opacity(isHovered ? 0.15 : 0.1)).cornerRadius(12)
         .contentShape(Rectangle())
         .onHover { hovering in self.isHovered = hovering }
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             if isLockScreenMode {
                 navigationManager.navigateTo(.playlistDetail(playlist))
             } else {
@@ -2095,7 +2095,7 @@ struct PlaylistGridCard: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             if let onPlay {
                 Button(action: onPlay) {
@@ -2105,7 +2105,7 @@ struct PlaylistGridCard: View {
                         .frame(width: 32, height: 32)
                         .background(MaterialChartPalette.primary.opacity(0.16), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .help("Play playlist")
             } else if isPlaying {
                 Image(systemName: "waveform")
@@ -2144,7 +2144,7 @@ struct RecentlyPlayedCard: View {
                 Text(item.ownerName).font(.caption2).foregroundColor(.secondary).lineLimit(1).frame(width: 100, alignment: .leading)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding(4)
         .background(Color.white.opacity(isHovered ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
@@ -2171,7 +2171,7 @@ struct PopularReleaseCard: View {
                 Text(release.name).font(.caption.bold()).lineLimit(2).frame(width: 100, alignment: .leading)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding(4)
         .background(Color.white.opacity(isHovered ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
@@ -2210,7 +2210,7 @@ struct RecommendedTrackRow: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             TrackHoverActionsView(
                 trackURI: track.uri,
@@ -2522,7 +2522,7 @@ struct DevicesView: View {
                 deviceSubTabBar
                 if musicManager.isOfficialAPIAuthenticated {
                     Button("Log out") { musicManager.spotifyOfficialAPI.logout() }
-                        .buttonStyle(.plain).font(.caption).foregroundColor(.secondary)
+                        .buttonStyle(.sapphireInteractive()).font(.caption).foregroundColor(.secondary)
                 }
             }
 
@@ -2853,7 +2853,7 @@ fileprivate struct AppleMusicDeviceRow: View {
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16).background(.gray.opacity(0.13)).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)).contentShape(Rectangle())
-        .onTapGesture { if !device.isSelected { onSelect() } }
+        .interactiveCursor(.clickable).onTapGesture { if !device.isSelected { onSelect() } }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: device.isSelected)
         .onChange(of: volume) { _, _ in
             throttler.throttle { sendVolumeUpdate() }
@@ -2885,7 +2885,7 @@ fileprivate struct SpotifyDeviceRow: View {
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16).background(.gray.opacity(0.13)).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)).contentShape(Rectangle())
-        .onTapGesture { guard !device.isActive else { return }; onTransfer() }
+        .interactiveCursor(.clickable).onTapGesture { guard !device.isActive else { return }; onTransfer() }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: device.isActive)
     }
 
@@ -2947,7 +2947,7 @@ fileprivate struct SpotifyNativeDeviceRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .contentShape(Rectangle())
         .opacity(isControllerOnly ? 0.72 : 1)
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             guard !isActive else { return }
             if isControllerOnly { return }
             onTransfer()
@@ -2996,6 +2996,7 @@ fileprivate struct BoldPillSlider: View {
                 ZStack { Capsule().fill(Color.accentColor); textView.foregroundColor(.white) }.mask(Rectangle().frame(width: progressWidth).frame(maxWidth: .infinity, alignment: .leading))
             }
             .clipShape(Capsule()).contentShape(Capsule())
+            .interactiveCursor(.resizeHorizontal)
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { gesture in
                     let percentage = (gesture.location.x / width).clamped(to: 0...1)
@@ -3384,7 +3385,7 @@ struct PlaylistView: View {
                 .padding(.vertical, 6)
                 .background(Color.accentColor.opacity(0.16), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 
     // MARK: - Column headers (client-side sort)
@@ -3432,7 +3433,7 @@ struct PlaylistView: View {
             .foregroundStyle(sortOption == option ? Color.accentColor : Color.secondary)
             .frame(width: width, alignment: alignment)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 
     // MARK: - Navigation
@@ -3572,14 +3573,14 @@ private struct PlaylistTrackRow: View {
                             Text(viewModel.artists)
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .disabled(viewModel.firstArtistURI == nil)
                         Text("·").foregroundStyle(.quaternary)
                         Button(action: onAlbum) {
                             Text(viewModel.albumName)
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .disabled(viewModel.albumURI == nil)
                     }
                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -3626,7 +3627,7 @@ private struct PlaylistTrackRow: View {
         )
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             Task {
                 if !contextUri.hasPrefix("spotify:"),
                    musicManager.lastKnownBundleID == "com.apple.Music" {
@@ -3751,7 +3752,7 @@ struct SpotifyArtistDetailView: View {
                                                     .frame(width: 72)
                                             }
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.sapphireInteractive())
                                     }
                                 }
                             }
@@ -3821,7 +3822,7 @@ struct SpotifyArtistDetailView: View {
                     .padding(.vertical, 7)
                     .background(Color.accentColor.opacity(0.18), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
@@ -3850,7 +3851,7 @@ struct SpotifyArtistDetailView: View {
                                 .frame(width: 100, alignment: .leading)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
         }
@@ -3895,7 +3896,7 @@ struct SpotifyArtistDetailView: View {
                     .frame(width: 28, height: 28)
                     .background(MaterialChartPalette.primary.opacity(0.16), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .padding(.vertical, 2)
         .onHover { hovering in hoveredArtistTrackURI = hovering ? track.uri : nil }
@@ -3938,7 +3939,7 @@ struct SpotifyArtistDetailView: View {
             }
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 
     private func load() async {
@@ -4018,7 +4019,7 @@ struct SpotifyAlbumDetailView: View {
                         .padding(.vertical, 7)
                         .background(Color.accentColor.opacity(0.18), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -4102,7 +4103,7 @@ struct SpotifyMusicSearchView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
             .padding(.horizontal, 12)
@@ -4150,7 +4151,7 @@ struct SpotifyMusicSearchView: View {
                                         .padding(.vertical, 6)
                                         .background(MaterialChartPalette.primary.opacity(0.14), in: Capsule())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                             }
                         }
 
@@ -4181,7 +4182,7 @@ struct SpotifyMusicSearchView: View {
                                                     .frame(width: 80)
                                             }
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.sapphireInteractive())
                                     }
                                 }
                             }
@@ -4205,7 +4206,7 @@ struct SpotifyMusicSearchView: View {
                                                 Text(album.artistName).font(.caption2).foregroundStyle(.secondary).lineLimit(1).frame(width: 100, alignment: .leading)
                                             }
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.sapphireInteractive())
                                     }
                                 }
                             }
@@ -4250,11 +4251,11 @@ struct SpotifyMusicSearchView: View {
                                                 .frame(width: 28, height: 28)
                                                 .background(MaterialChartPalette.primary.opacity(0.16), in: Circle())
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.sapphireInteractive())
                                     }
                                     .padding(.vertical, 4)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                             }
                         }
                     }
@@ -4302,7 +4303,7 @@ struct SpotifyMusicSearchView: View {
                     .frame(width: 28, height: 28)
                     .background(MaterialChartPalette.secondary.opacity(0.18), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -4447,7 +4448,7 @@ struct SpotifyNowPlayingExtras: View {
                                 .background(Color.accentColor.opacity(0.15))
                                 .clipShape(Capsule())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                         }
                     }
                 }
@@ -4544,7 +4545,7 @@ struct SimilarAlbumCard: View {
                     .frame(width: 110, alignment: .leading)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding(4)
         .background(Color.white.opacity(isHovered ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
@@ -4616,7 +4617,7 @@ struct MerchCard: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding(4)
         .background(Color.white.opacity(isHovered ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
@@ -4926,7 +4927,7 @@ struct AppleMusicSearchView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
             .padding(.horizontal, 10)
@@ -5038,7 +5039,7 @@ private struct ITunesTrackRow: View {
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .onHover { isHovered = $0 }
     }
 }

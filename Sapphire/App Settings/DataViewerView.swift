@@ -85,7 +85,7 @@ struct DataViewerView: View {
             Button("Try Again") {
                 loadData()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

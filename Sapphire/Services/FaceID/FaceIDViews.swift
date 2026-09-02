@@ -81,7 +81,7 @@ struct FaceIDRegistrationView: View {
                     Spacer()
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                    }.buttonStyle(PlainButtonStyle())
+                    }.buttonStyle(.sapphireInteractive())
                 }
                 .padding(.horizontal, 20).padding(.top, 20)
 
@@ -159,13 +159,13 @@ struct FaceIDRegistrationView: View {
                                 Button("Skip") {
                                     cameraController.skipExtendedRegistration()
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.bordered).interactiveCursor(.clickable)
                                 .controlSize(.regular)
 
                                 Button("Continue") {
                                     cameraController.acceptExtendedRegistration()
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                                 .controlSize(.regular)
                                 .tint(.blue)
                             }

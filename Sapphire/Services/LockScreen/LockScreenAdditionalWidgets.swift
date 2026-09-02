@@ -238,7 +238,7 @@ struct LockScreenCaffeineMiniWidget: View {
             .foregroundStyle(.white)
             .frame(minWidth: 220)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 

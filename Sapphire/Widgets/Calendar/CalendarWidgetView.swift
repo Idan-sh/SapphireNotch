@@ -128,7 +128,7 @@ struct CalendarWidgetView: View {
                                 containerMidX: containerProxy.frame(in: .global).midX
                             )
                             .id(date)
-                            .onTapGesture {
+                            .interactiveCursor(.clickable).onTapGesture {
                                 HapticManager.shared.perform(HapticFeedbackType.medium)
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                                     viewModel.selectDate(date)

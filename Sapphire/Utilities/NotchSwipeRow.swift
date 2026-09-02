@@ -249,7 +249,7 @@ struct NotchCapsuleIconButton: View {
                 activeTint: activeTint
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help(help ?? "")
     }
 }

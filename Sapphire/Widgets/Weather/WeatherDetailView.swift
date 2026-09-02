@@ -67,7 +67,7 @@ struct WeatherPlayerView: View {
                         .font(.caption)
                         .fontWeight(.medium)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .foregroundColor(.white.opacity(0.7))
                 .padding(6)
                 .background(.black.opacity(0.2))

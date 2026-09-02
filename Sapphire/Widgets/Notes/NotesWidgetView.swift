@@ -151,7 +151,7 @@ struct NotesPlayerView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                     }
                 }
                 .padding(.horizontal, 12)
@@ -287,7 +287,7 @@ struct NotesPlayerView: View {
             )
             .opacity(note.isDone ? 0.82 : 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .contextMenu {
             Button(note.isDone ? "Mark Undone" : "Mark Done") {
                 notesManager.toggleNoteDone(id: note.id)
@@ -436,7 +436,7 @@ private struct InNotchNoteEditor: View {
                         .padding(.vertical, 7)
                         .background(Color.yellow.opacity(0.22), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)

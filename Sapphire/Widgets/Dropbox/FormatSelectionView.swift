@@ -46,7 +46,7 @@ struct FormatSelectionView: View {
             Button(action: onDismiss) {
                 Image(systemName: "xmark.circle.fill")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .font(.title2)
             .foregroundStyle(.secondary, .tertiary)
             .padding()
@@ -80,7 +80,7 @@ private struct FormatButton: View {
             .background(Color.white.opacity(isHovering ? 0.2 : 0.1))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .scaleEffect(isHovering ? 1.05 : 1.0)
         .onHover { hovering in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {

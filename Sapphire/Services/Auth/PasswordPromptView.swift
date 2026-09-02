@@ -35,6 +35,7 @@ struct PasswordPromptView: View {
             SecureField("Password", text: $password)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .multilineTextAlignment(.center)
+                .interactiveCursor(.text)
 
             if let message = errorMessage {
                 Text(message)
@@ -46,6 +47,7 @@ struct PasswordPromptView: View {
                 Button("Cancel") {
                     isPresented = false
                 }
+                .buttonStyle(.sapphireInteractive())
                 .keyboardShortcut(.cancelAction)
 
                 Button("OK") {
@@ -58,6 +60,7 @@ struct PasswordPromptView: View {
                         onSubmit(password)
                     }
                 }
+                .buttonStyle(.sapphireInteractive())
                 .keyboardShortcut(.defaultAction)
             }
         }

@@ -224,7 +224,7 @@ struct LockScreenFullScreenMusicPane: View {
                             .frame(width: 36, height: 36)
                             .background(Color.white.opacity(0.16), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
 
                     Text(overlayTitle(for: overlay))
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -282,7 +282,7 @@ struct LockScreenFullScreenMusicPane: View {
                     .frame(width: 36, height: 36)
                     .background(Color.white.opacity(0.16), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .help("Close")
 
             Spacer()
@@ -305,7 +305,7 @@ struct LockScreenFullScreenMusicPane: View {
                     .frame(width: 36, height: 36)
                     .background(Color.white.opacity(controller.showLyrics ? 0.24 : 0.16), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .help(controller.showLyrics ? "Show player" : "Show lyrics")
         }
     }

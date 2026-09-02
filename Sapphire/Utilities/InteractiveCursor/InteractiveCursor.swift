@@ -60,6 +60,20 @@ extension View {
         environment(\.interactiveCursorBackend, .notch)
             .environment(\.notchCursorCoordinator, coordinator)
     }
+
+    /// Applies the standard pointing-hand cursor for tappable non-`Button` views.
+    func clickable(onTap action: @escaping () -> Void) -> some View {
+        interactiveCursor(.clickable)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: action)
+    }
+
+    /// Applies the standard pointing-hand cursor for tappable non-`Button` views (counted tap).
+    func clickable(count: Int, onTap action: @escaping () -> Void) -> some View {
+        interactiveCursor(.clickable)
+            .contentShape(Rectangle())
+            .onTapGesture(count: count, perform: action)
+    }
 }
 
 private struct InteractiveCursorModifier: ViewModifier {

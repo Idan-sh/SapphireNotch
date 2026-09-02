@@ -146,7 +146,7 @@ struct DeviceAdjustView: View {
                     .padding(14)
                     .background(cardBackground)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .frame(width: 360)
 
@@ -216,6 +216,7 @@ fileprivate struct ModernDarkSlider: View {
                     textView.foregroundColor(.white)
                 }.mask(Rectangle().frame(width: max(0, min(width, progress))).frame(maxWidth: .infinity, alignment: .leading))
             }.clipShape(Capsule())
+            .interactiveCursor(.resizeHorizontal)
             .gesture(DragGesture(minimumDistance: 0).onChanged { v in
                 let pct = Double(v.location.x / width)
                 value = min(max((range.upperBound - range.lowerBound) * pct + range.lowerBound, range.lowerBound), range.upperBound)

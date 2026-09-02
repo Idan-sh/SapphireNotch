@@ -40,7 +40,7 @@ struct SettingsSidebarView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                 }
             }
             .padding(.horizontal, 12)
@@ -113,7 +113,7 @@ struct SettingsSidebarView: View {
                 .padding(.vertical, 3)
                 .padding(.leading, 12)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .padding(.bottom, 15)
         }
     }
@@ -170,7 +170,7 @@ struct SidebarAccountCardView: View {
             .background(isSelected ? Color.white.opacity(0.06) : Color.clear)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .padding(.horizontal, 12)
         .padding(.bottom, 10)
@@ -203,7 +203,7 @@ struct CustomTrafficLightButtons: View {
 struct TrafficLightButtonStyle: ButtonStyle {
     let color: Color; let isHovering: Bool
     func makeBody(configuration: Configuration) -> some View {
-        ZStack { Circle().fill(color); configuration.label.foregroundStyle(.black.opacity(0.6)).opacity(isHovering ? 1 : 0) }.frame(width: 12, height: 12)
+        ZStack { Circle().fill(color); configuration.label.interactiveCursor(.clickable).foregroundStyle(.black.opacity(0.6)).opacity(isHovering ? 1 : 0) }.frame(width: 12, height: 12)
     }
 }
 

@@ -412,7 +412,7 @@ struct MusicPlayerView: View {
                                 .background(Color.pink.gradient, in: Circle())
                                 .shadow(color: .pink.opacity(0.45), radius: 3, y: 1)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .frame(width: 56, height: 56, alignment: .bottomTrailing)
                         .offset(x: 4, y: 4)
                         .help("Nearby concerts")
@@ -420,7 +420,7 @@ struct MusicPlayerView: View {
                 }
                 .frame(width: 56, height: 56)
                 .animation(.easeInOut, value: showTemporaryLikedGlow)
-                .onTapGesture(count: 2) {
+                .interactiveCursor(.clickable).onTapGesture(count: 2) {
                     guard isSpotifyOrAppleMusic else { return }
                     Task {
                         let wasLiked = musicManager.isLiked
@@ -433,7 +433,7 @@ struct MusicPlayerView: View {
                         }
                     }
                 }
-                .onTapGesture {
+                .interactiveCursor(.clickable).onTapGesture {
                     if isLockScreenMode {
                         LockScreenMusicPaneController.shared.open()
                     } else {
@@ -485,7 +485,7 @@ struct MusicPlayerView: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .id("track-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")")
 
                 Spacer(minLength: 4)
@@ -554,7 +554,7 @@ struct MusicPlayerView: View {
                                         .background(musicManager.accentColor.opacity(0.16), in: Capsule())
                                         .foregroundStyle(musicManager.accentColor)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.sapphireInteractive())
                                 }
                             }
                             .padding(.leading, 2)
@@ -627,7 +627,7 @@ struct MusicPlayerView: View {
                         Spacer()
                         MusicPlayerActionButton(type: primaryButtons.dropFirst().first, size: .primary)
                     }
-                    .buttonStyle(PlainButtonStyle()).font(.system(size: 22)).foregroundColor(.primary)
+                    .buttonStyle(.sapphireInteractive()).font(.system(size: 22)).foregroundColor(.primary)
                     .padding(.top, (!musicManager.hasCurrentDisplayableLyric && accessoryButtons.isEmpty) ? 8 : 0)
                     .padding(.bottom, !musicManager.hasCurrentDisplayableLyric ? 4 : 0)
 
@@ -1000,7 +1000,7 @@ struct NextTrackInline: View {
             .scaleEffect(isHovering ? 1.02 : 1.0)
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
         .onHover { isHovering = $0 }
         .help(helpText)
@@ -1051,7 +1051,7 @@ struct NotchMediaSourceSwitcher: View {
                             )
                             .opacity(selected ? 1.0 : 0.55)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .help(label(for: key))
                 }
             }
@@ -1171,7 +1171,7 @@ private struct OpenPlayerView: View {
                     .background(Color.white.opacity(0.15))
                     .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .frame(width: 300, height: 100)
     }
@@ -1473,7 +1473,7 @@ struct WaveformView: View {
                         .foregroundColor(musicManager.accentColor)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
 
             } else if let icon = musicManager.transientIcon {

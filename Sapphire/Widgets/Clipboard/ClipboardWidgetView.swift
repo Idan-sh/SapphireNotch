@@ -90,7 +90,7 @@ struct ClipboardWidgetView: View {
         .background(MaterialChartPalette.surfaceContainer)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             clipboardManager.copyItem(item)
         }
     }
@@ -133,7 +133,7 @@ struct ClipboardPlayerView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                     }
                 }
                 .padding(.horizontal, 12)
@@ -266,7 +266,7 @@ struct ClipboardPlayerView: View {
                 .stroke(MaterialChartPalette.outline, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             clipboardManager.copyItem(item)
         }
         .contextMenu {
@@ -303,7 +303,7 @@ struct ClipboardPlayerView: View {
                     .animation(.spring(response: 0.35, dampingFraction: 0.55), value: copied)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
     }
 

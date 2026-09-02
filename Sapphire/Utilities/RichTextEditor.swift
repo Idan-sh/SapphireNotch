@@ -136,7 +136,7 @@ struct RichTextToolbar: View {
                 .frame(width: 26, height: 26)
                 .background(MaterialChartPalette.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help(tip)
     }
 

@@ -16,7 +16,7 @@ struct BetaBlockerView: View {
             Button("Continue") {
                 onValidationComplete()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
         }
         .padding(28)
         .frame(width: 420, height: 260)
@@ -40,7 +40,7 @@ struct NativePaymentSheetView: View {
             HStack {
                 Spacer()
                 Button("Close", action: onDismiss)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             }
         }
         .padding(24)

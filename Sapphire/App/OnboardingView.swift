@@ -209,7 +209,7 @@ private struct HelperInstallationStepView: View {
                         .padding(.vertical, 12)
                 }
                 .disabled(helperManager.isResettingHelper)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                 .tint(.accentColor)
                 .padding(.top, 20)
             }
@@ -224,7 +224,7 @@ private struct HelperInstallationStepView: View {
             Button(action: onContinue) {
                 Text("Skip for now").font(.subheadline).foregroundColor(.secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .padding(.top, 8)
         }
         .onAppear {
@@ -408,13 +408,13 @@ private struct SpotifySetupStepView: View {
                     if isLoading {
                         VStack(spacing: 8) { ProgressView(); Text("Logging in...").font(.caption).foregroundColor(.secondary) }.frame(height: 40)
                     } else {
-                        Button("Log In with Spotify", action: handlePrivateApiLogin).buttonStyle(.borderedProminent).tint(.green).controlSize(.large).frame(height: 40)
+                        Button("Log In with Spotify", action: handlePrivateApiLogin).buttonStyle(.borderedProminent).interactiveCursor(.clickable).tint(.green).controlSize(.large).frame(height: 40)
                     }
                     if let error = error { Text(error).font(.caption).foregroundColor(.red).padding(.top, 4) }
                 }
             }.padding(25).background(.black.opacity(0.15)).clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1)).padding(50)
             Spacer()
-            if musicManager.isPrivateAPIAuthenticated { OnboardingButton(title: "Continue", action: onNext) } else if !isLoading { Button("Skip for Now", action: onNext).buttonStyle(.plain).foregroundColor(.secondary).padding(.bottom, 50) } else { OnboardingButton(title: "Continue", action: {}).hidden().padding(.bottom, 50) }
+            if musicManager.isPrivateAPIAuthenticated { OnboardingButton(title: "Continue", action: onNext) } else if !isLoading { Button("Skip for Now", action: onNext).buttonStyle(.sapphireInteractive()).foregroundColor(.secondary).padding(.bottom, 50) } else { OnboardingButton(title: "Continue", action: {}).hidden().padding(.bottom, 50) }
         }
         .sheet(item: $spotifyPrivateAPI.loginChallenge) { _ in
             SpotifyLoginWebView(
@@ -644,6 +644,7 @@ private struct SubscriptionOverviewStepView: View {
                 Link("Upgrade on website instead", destination: URL(string: "https://sapphire-app.tech/")!)
                     .font(.caption)
                     .foregroundStyle(.purple)
+                    .interactiveCursor(.clickable)
             }
 
             Spacer()
@@ -795,7 +796,7 @@ private struct OnboardingPlanCard: View {
                         )
                         .shadow(color: accent.opacity(0.35), radius: 10, y: 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
         }
         .padding(16)
@@ -860,15 +861,15 @@ private struct FinishStepView: View {
             HStack(spacing: 12) {
                 Link(destination: URL(string: "https://sapphire-app.tech/")!) {
                     Image(systemName: "link").resizable().aspectRatio(contentMode: .fit).frame(width: 18, height: 18).foregroundColor(.white).padding(6).background(Color.blue).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }.buttonStyle(PlainButtonStyle())
+                }.buttonStyle(.sapphireInteractive())
 
                 Link(destination: ReleaseSource.repositoryURL) {
                     Image("github_logo").resizable().renderingMode(.template).aspectRatio(contentMode: .fit).frame(width: 18, height: 18).foregroundColor(.white).padding(6).background(Color.black).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }.buttonStyle(PlainButtonStyle())
+                }.buttonStyle(.sapphireInteractive())
 
                 Link(destination: URL(string: "https://discord.gg/TdRjC2kNnU")!) {
                     Image("discord_logo").resizable().aspectRatio(contentMode: .fit).frame(width: 18, height: 18).padding(6).background(Color(red: 0.35, green: 0.40, blue: 0.95)).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }.buttonStyle(PlainButtonStyle())
+                }.buttonStyle(.sapphireInteractive())
             }
 
             OnboardingUpdateStatusView(updateChecker: updateChecker)
@@ -893,7 +894,7 @@ private struct OnboardingUpdateStatusView: View {
             switch updateChecker.status {
             case .checking: HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Checking for updates...").foregroundStyle(.secondary) }
             case .upToDate: HStack(spacing: 8) { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green); Text("You are up to date!").foregroundStyle(.secondary) }
-            case .available(let version, _): VStack(spacing: 8) { Text("Version \(version) is available!").font(.headline); Link(destination: ReleaseSource.releasesPageURL) { Text("Download from GitHub") }.buttonStyle(.bordered).tint(.accentColor) }
+            case .available(let version, _): VStack(spacing: 8) { Text("Version \(version) is available!").font(.headline); Link(destination: ReleaseSource.releasesPageURL) { Text("Download from GitHub") }.buttonStyle(.bordered).interactiveCursor(.clickable).tint(.accentColor) }
             case .error(let message): HStack(spacing: 8) { Image(systemName: "xmark.octagon.fill").foregroundColor(.red); Text(message).foregroundStyle(.secondary).lineLimit(1) }
             default: EmptyView()
             }
@@ -924,7 +925,7 @@ private struct OnboardingButton: View {
             Text(title).font(.headline.weight(.bold)).foregroundColor(isEnabled ? .black.opacity(0.8) : .gray).padding(.horizontal, 60).frame(height: 50)
                 .background(LinearGradient(gradient: Gradient(colors: isEnabled ? [Color(red: 154/255, green: 249/255, blue: 165/255), Color(red: 174/255, green: 255/255, blue: 247/255)] : [.gray.opacity(0.5)]), startPoint: .leading, endPoint: .trailing))
                 .clipShape(Capsule()).shadow(color: .white.opacity(isEnabled ? 0.3 : 0), radius: 10, y: 5)
-        }.buttonStyle(.plain).scaleEffect(isEnabled ? 1.0 : 0.98).padding(.bottom, 50)
+        }.buttonStyle(.sapphireInteractive()).scaleEffect(isEnabled ? 1.0 : 0.98).padding(.bottom, 50)
     }
 }
 
@@ -939,7 +940,7 @@ private struct MusicServiceButton: View {
             Text(title).font(.system(size: 18, weight: .bold, design: .rounded)); Spacer()
             Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.white).opacity(isSelected ? 1.0 : 0.0).scaleEffect(isSelected ? 1.0 : 0.5)
         }.padding(.horizontal, 20).frame(height: 65).background(ZStack { RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.black.opacity(0.2)); RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1); if isSelected { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.indigo, lineWidth: 3).shadow(color: .indigo.opacity(0.5), radius: 8) } })
-        .scaleEffect(isPressed ? 0.97 : 1.0).contentShape(Rectangle()).onTapGesture { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { action() } }
+        .scaleEffect(isPressed ? 0.97 : 1.0).contentShape(Rectangle()).interactiveCursor(.clickable).onTapGesture { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { action() } }
         .gesture(DragGesture(minimumDistance: 0).onChanged { _ in if !isPressed { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = true } } }.onEnded { _ in withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = false } }).animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
@@ -970,7 +971,7 @@ private struct PermissionRowView: View {
                         .padding(.horizontal, 18)
                         .padding(.vertical, 8)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .background(Color.accentColor.gradient)
                 .foregroundColor(.white)
                 .clipShape(Capsule())

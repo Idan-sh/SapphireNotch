@@ -48,7 +48,7 @@ private struct LockScreenBackButton: View {
                 .padding(10)
                 .background(Color.white.opacity(0.15).clipShape(Circle()))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding()
     }
 }

@@ -1355,6 +1355,7 @@ struct DynamicSliderIndicator: View {
             }
             .clipShape(Capsule())
             .contentShape(Rectangle())
+            .interactiveCursor(.resizeHorizontal)
             .shadow(color: shadowColor.opacity(0.9), radius: glowRadius)
             .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                 let newLevel = Float(value.location.x / totalWidth).clamped(to: 0...1)
@@ -1388,6 +1389,7 @@ fileprivate struct BoldPillSlider: View {
             }
             .clipShape(Capsule())
             .contentShape(Capsule())
+            .interactiveCursor(.resizeHorizontal)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in

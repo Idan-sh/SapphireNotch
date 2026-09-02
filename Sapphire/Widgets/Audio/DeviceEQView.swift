@@ -204,7 +204,7 @@ struct ModernChip: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -246,6 +246,7 @@ struct WaveformEQView: View {
                 }
             }
             .contentShape(Rectangle())
+            .interactiveCursor(.draggable)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -366,7 +367,7 @@ struct PresetButton: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .scaleEffect(isSelected ? 1.05 : 1.0)
     }
 }

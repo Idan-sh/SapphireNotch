@@ -15,7 +15,7 @@ struct MicrophoneLiveActivityViewLeft: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(mic.isMuted ? Color.red : Color.orange)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .accessibilityLabel(mic.isMuted ? "Unmute microphone" : "Mute microphone")
     }
 }
@@ -29,7 +29,7 @@ struct MicrophoneLiveActivityViewRight: View {
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundColor(mic.isMuted ? Color.red : Color.orange)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .accessibilityLabel(mic.isMuted ? "Unmute microphone" : "Mute microphone")
     }
 }

@@ -108,7 +108,7 @@ struct LockedSettingsSectionView: View {
             Button("Open Account Settings") {
                 NotificationCenter.default.post(name: .sapphireOpenAccountPane, object: nil)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             .tint(.purple)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -182,7 +182,7 @@ struct PermissionStatusRowView: View {
             switch status {
             case .granted: Image(systemName: "checkmark.circle.fill").font(.title2).foregroundColor(.green)
             case .denied: Image(systemName: "xmark.circle.fill").font(.title2).foregroundColor(.red)
-            case .notRequested: Button("Request") { permissionsManager.requestPermission(permission.type) }.buttonStyle(.bordered).tint(.accentColor)
+            case .notRequested: Button("Request") { permissionsManager.requestPermission(permission.type) }.buttonStyle(.bordered).interactiveCursor(.clickable).tint(.accentColor)
             }
         }.padding(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
     }
@@ -288,7 +288,7 @@ struct NotchAppearanceEditorView: View {
                         }) {
                             Image(systemName: "minus.circle.fill").foregroundColor(.red)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .disabled(appearance.gradientColors.count <= 1)
                     }
                     Slider(value: $color.location, in: 0...1) {
@@ -318,7 +318,7 @@ struct NotchAppearanceEditorView: View {
                     Text("Add Color Stop")
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .tint(.accentColor)
             .padding(.top, 5)
             .padding(.horizontal)
@@ -528,7 +528,7 @@ struct GeneralSettingsView: View {
                                         settings.settings.customAnimationConfiguration = .init()
                                     }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                                 .foregroundColor(.accentColor)
                                 .help("Reset all custom animation values to the 'Snappy' defaults.")
                             }
@@ -765,7 +765,7 @@ struct CustomNotchConfigView: View {
                         .font(.title2)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding()
 
@@ -835,7 +835,7 @@ struct CustomNotchConfigView: View {
                     syncConfig()
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             }
             .padding()
         }
@@ -1116,7 +1116,7 @@ struct ClipboardSettingsView: View {
                             ClipboardManager.shared.clearHistory()
                             historyCount = 0
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered).interactiveCursor(.clickable)
                         .disabled(historyCount == 0)
                     }
                     .padding()
@@ -1767,7 +1767,7 @@ fileprivate struct AddedShortcutRow: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .id(shortcut)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .popover(isPresented: $isShowingEditor, arrowEdge: .leading) {
                 ShortcutEditorView(shortcut: $shortcut)
             }
@@ -1780,7 +1780,7 @@ fileprivate struct AddedShortcutRow: View {
                     .font(.system(size: 16))
                     .foregroundColor(.red.opacity(0.8))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .padding(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
     }
@@ -1805,7 +1805,7 @@ fileprivate struct AvailableShortcutRow: View {
                     .foregroundColor(isEnabled ? .green.opacity(0.8) : .secondary)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .padding(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
     }
 }
@@ -2135,7 +2135,7 @@ fileprivate struct IconPickerView: View {
                         .foregroundColor(isSearchVisible ? .accentColor : .white)
                         .padding(5)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
 
                 Button(action: {
                     dismiss()
@@ -2145,7 +2145,7 @@ fileprivate struct IconPickerView: View {
                         .foregroundColor(.gray)
                         .padding(5)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding([.horizontal, .top])
             .padding(.bottom, 8)
@@ -2193,7 +2193,7 @@ fileprivate struct IconPickerView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                             .foregroundColor(.white)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.sapphireInteractive())
                                 }
                             }
                         }
@@ -2664,7 +2664,7 @@ struct SnapZonesSettingsView: View {
                 } label: {
                     HStack { Image(systemName: "plus"); Text("Add Layout") }
                 }
-                .buttonStyle(.borderless).tint(.accentColor)
+                .buttonStyle(.borderless).interactiveCursor(.clickable).tint(.accentColor)
                 .disabled(allLayouts.count == settings.settings.snapZoneLayoutOptions.count)
 
             }.padding([.horizontal, .top]).padding(.bottom, 8)
@@ -2690,7 +2690,7 @@ struct SnapZonesSettingsView: View {
                                     Image(systemName: "trash")
                                         .foregroundColor(.red)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                             }
                         }
                     }
@@ -2710,7 +2710,7 @@ struct SnapZonesSettingsView: View {
             HStack {
                 Text("App-Specific Overrides").font(.headline)
                 Spacer()
-                Button("Add App") { isShowingAppPicker = true }.buttonStyle(.borderless).tint(.accentColor)
+                Button("Add App") { isShowingAppPicker = true }.buttonStyle(.borderless).interactiveCursor(.clickable).tint(.accentColor)
             }.padding([.horizontal, .top]).padding(.bottom, 8)
             Text("Force a specific layout mode (Single or Multi) when dragging a particular app.").font(.caption).foregroundColor(.secondary).padding(.horizontal).padding(.bottom)
             Divider()
@@ -2747,7 +2747,7 @@ struct SnapZonesSettingsView: View {
             HStack {
                 Text("My Custom Layouts").font(.headline)
                 Spacer()
-                Button("New Layout") { layoutToEdit = SnapLayout(name: "New Custom Layout", zones: []) }.buttonStyle(.borderless).tint(.accentColor)
+                Button("New Layout") { layoutToEdit = SnapLayout(name: "New Custom Layout", zones: []) }.buttonStyle(.borderless).interactiveCursor(.clickable).tint(.accentColor)
             }.padding()
             Divider()
             if settings.settings.customSnapLayouts.isEmpty {
@@ -2770,7 +2770,7 @@ struct SnapZonesSettingsView: View {
                 Button("New Plane") {
                     guard let firstLayout = allLayouts.first else { return }
                     planeToEdit = Plane(name: "New Plane", layoutID: firstLayout.id)
-                }.buttonStyle(.borderless).tint(.accentColor)
+                }.buttonStyle(.borderless).interactiveCursor(.clickable).tint(.accentColor)
             }.padding([.horizontal, .top]).padding(.bottom, 8)
             Text("Trigger layouts with keyboard shortcuts to arrange windows instantly.").font(.caption).foregroundColor(.secondary).padding(.horizontal).padding(.bottom)
             Divider()
@@ -2907,7 +2907,7 @@ fileprivate struct AppSpecificLayoutConfigRow: View {
                 ModernMenuPickerWithID(selection: binding, options: allLayouts, titleKeyPath: \.name)
                     .frame(width: 150)
             case .multi:
-                Button("Edit", action: onEditMulti).buttonStyle(.borderless).tint(.accentColor)
+                Button("Edit", action: onEditMulti).buttonStyle(.borderless).interactiveCursor(.clickable).tint(.accentColor)
             case .useGlobalDefault:
                 EmptyView().frame(width: 150, height: 1)
             }
@@ -2915,7 +2915,7 @@ fileprivate struct AppSpecificLayoutConfigRow: View {
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill").font(.body).foregroundColor(.secondary.opacity(0.7))
             }
-            .buttonStyle(.plain).padding(.leading, 8)
+            .buttonStyle(.sapphireInteractive()).padding(.leading, 8)
         }
         .padding(.vertical, 8).padding(.horizontal, 20)
     }
@@ -2955,7 +2955,7 @@ fileprivate struct MultiLayoutPickerView: View {
                     List(availableLayouts) { layout in
                         Button(action: { editedLayoutIDs.append(layout.id) }) {
                             HStack { Text(layout.name); Spacer(); Image(systemName: "plus.circle.fill").foregroundColor(.green) }
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.sapphireInteractive())
                     }.listStyle(.sidebar)
                 }
                 .frame(minWidth: 220)
@@ -2974,7 +2974,7 @@ fileprivate struct MultiLayoutPickerView: View {
                                         Image(systemName: "minus.circle.fill")
                                             .foregroundColor(.red)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.sapphireInteractive())
                                 }
                             }
                         }
@@ -2991,7 +2991,7 @@ fileprivate struct MultiLayoutPickerView: View {
                 Button("Save") {
                     onSave(editedLayoutIDs)
                     dismiss()
-                }.buttonStyle(.borderedProminent)
+                }.buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             }.padding()
         }
         .frame(width: 550, height: 450)
@@ -3032,7 +3032,7 @@ fileprivate struct ModernMenuPicker<T: Identifiable & Hashable>: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .foregroundColor(.primary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -3052,13 +3052,13 @@ fileprivate struct CustomLayoutRow: View {
             Button(action: onEdit) {
                 Image(systemName: "pencil")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .tint(.secondary)
 
             Button(action: onDelete) {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .tint(.red)
             .padding(.leading, 8)
         }
@@ -3100,7 +3100,7 @@ fileprivate struct AppSpecificLayoutRow: View {
                     .font(.body)
                     .foregroundColor(.secondary.opacity(0.7))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .padding(.leading, 8)
         }
         .padding(.vertical, 8)
@@ -3141,7 +3141,7 @@ fileprivate struct ModernMenuPickerWithID<T: Identifiable & Hashable>: View wher
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .foregroundColor(.primary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -3161,7 +3161,7 @@ fileprivate struct PlaneRow: View {
                 .font(.title2)
                 .frame(width: 30)
                 .foregroundColor(.accentColor)
-                .onTapGesture(perform: onEdit)
+                .interactiveCursor(.clickable).onTapGesture(perform: onEdit)
 
             VStack(alignment: .leading) {
                 Text(plane.name).font(.headline)
@@ -3169,14 +3169,14 @@ fileprivate struct PlaneRow: View {
                     .font(.caption).foregroundColor(.secondary)
             }
             .contentShape(Rectangle())
-            .onTapGesture(perform: onEdit)
+            .interactiveCursor(.clickable).onTapGesture(perform: onEdit)
 
             Spacer()
 
             Button(action: onDelete) {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .tint(.red)
         }
         .padding(.horizontal, 20)
@@ -3210,7 +3210,7 @@ fileprivate struct AppPickerView: View {
                         Text(app.name)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .listRowSeparator(.hidden)
             }
             .listStyle(.plain)
@@ -3628,7 +3628,7 @@ struct ProximityUnlockSettingsView: View {
                             let profileName = registeredFaces.isEmpty ? "Primary Face" : "Secondary Face"
                             pendingFaceProfileAction = FaceProfileAction(kind: .register, profileName: profileName)
                         }) { Label("Add Face", systemImage: "plus.circle.fill") }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         Spacer()
                     }.padding(.bottom)
                 }
@@ -3861,7 +3861,7 @@ fileprivate struct DeviceRowView: View {
             .padding(.vertical, 6)
             .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -3916,7 +3916,7 @@ fileprivate struct FindDeviceByDistanceWizard: View {
             self.closeReadings = Dictionary(uniqueKeysWithValues: authManager.scannedDevices.map { ($0.id, $0.rssi) })
             self.wizardStep = 2
             startCountdown()
-        }.buttonStyle(.borderedProminent)
+        }.buttonStyle(.borderedProminent).interactiveCursor(.clickable)
     }
 
     @ViewBuilder
@@ -3956,7 +3956,7 @@ fileprivate struct FindDeviceByDistanceWizard: View {
                             .font(.caption.monospaced())
                             .foregroundColor(.secondary)
                     }
-                }.buttonStyle(.plain)
+                }.buttonStyle(.sapphireInteractive())
             }
         }
 
@@ -4083,7 +4083,7 @@ fileprivate struct CalibrateRSSIView: View {
                 self.wizardStep = 2
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
         .disabled(isMeasuring || calibratingDevice == nil)
     }
 
@@ -4112,7 +4112,7 @@ fileprivate struct CalibrateRSSIView: View {
                 self.wizardStep = 3
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
         .disabled(isMeasuring || calibratingDevice == nil)
     }
 
@@ -4148,7 +4148,7 @@ fileprivate struct CalibrateRSSIView: View {
                     settings.settings.bluetoothUnlockUnlockRSSI = suggestedUnlock
                     settings.settings.bluetoothUnlockLockRSSI = suggestedLock
                     dismiss()
-                }.buttonStyle(.borderedProminent)
+                }.buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             }
             .padding(.top)
 
@@ -4220,7 +4220,7 @@ struct FanControlSectionView: View {
                     Button("Retry Detection") {
                         Task { await fanManager.refreshHardwareState(forceRediscovery: true) }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 }
                 .padding()
             } else {
@@ -4384,7 +4384,7 @@ struct FanControlSheetView: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("OK") { saveAndDismiss() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -4447,7 +4447,7 @@ private struct FanCurveEditorView: View {
                 Button("Reset") {
                     points = FanManager.defaultCurvePoints(for: fan)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.borderless).interactiveCursor(.clickable)
             }
 
             Text("Set RPM at each temperature. Sapphire interpolates between points.")
@@ -4494,7 +4494,7 @@ private struct FanCurveEditorView: View {
                 } label: {
                     Label("Add Point", systemImage: "plus.circle.fill")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.borderless).interactiveCursor(.clickable)
             }
         }
     }
@@ -4553,7 +4553,7 @@ struct CalibrationView: View {
                             Text("Start Calibration")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         .tint(.purple)
                         .disabled(batteryMonitor.currentState?.isPluggedIn == false)
                     }
@@ -4802,7 +4802,7 @@ struct DateRangePickerView: View {
                 }
                 showCustomPicker = false
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             .frame(maxWidth: .infinity)
         }
         .padding()
@@ -4834,7 +4834,7 @@ fileprivate struct PickerButton: View {
             )
             .foregroundColor(isSelected ? .primary : .secondary)
             .contentShape(Rectangle())
-            .onTapGesture(perform: action)
+            .interactiveCursor(.clickable).onTapGesture(perform: action)
     }
 }
 
@@ -5321,7 +5321,7 @@ struct BatterySpecsCard: View {
                             in: Capsule()
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             Spacer()
         }
@@ -5896,6 +5896,7 @@ struct BatteryHistoryView: View {
             }
         }
         .chartXSelection(value: $hoveredDate)
+        .interactiveCursor(.clickable)
         .simultaneousGesture(TapGesture().onEnded {
             if let entry = hoveredEntry {
                 withAnimation(.easeOut(duration: 0.18)) {
@@ -6092,7 +6093,7 @@ struct BatteryDataPointCard: View {
                         .frame(width: 28, height: 28)
                         .background(MaterialChartPalette.surfaceContainer, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
 
             LazyVGrid(
@@ -6576,7 +6577,7 @@ struct BatteryConfigurationView: View {
             HStack {
                 Text("Manage Schedule").font(.subheadline.bold())
                 Spacer()
-                Button("Open Scheduler") { showingScheduleSheet = true }.buttonStyle(.bordered)
+                Button("Open Scheduler") { showingScheduleSheet = true }.buttonStyle(.bordered).interactiveCursor(.clickable)
             }.padding()
         }.modifier(SettingsContainerModifier())
     }
@@ -6636,7 +6637,7 @@ struct OneTimeDischargeView: View {
                     Button("Stop", role: .destructive) {
                         settings.settings.oneTimeDischargeEnabled = false
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                     .padding(.top, 5)
                 }
                 .padding(.horizontal)
@@ -6658,7 +6659,7 @@ struct OneTimeDischargeView: View {
                         Text("Start One-Time Discharge")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                     .tint(.blue)
                 }
                 .padding(.horizontal)
@@ -7039,7 +7040,7 @@ struct HUDSettingsView: View {
                                     Image(systemName: "arrow.counterclockwise")
                                         .foregroundColor(.secondary)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.sapphireInteractive())
                                 .help("Reset to global slider step")
                             }
                             .padding(.vertical, 2)
@@ -7343,7 +7344,7 @@ struct MusicSettingsView: View {
                                 ProgressView().frame(maxWidth: .infinity, alignment: .center)
                             } else {
                                 Button("Log In via Private API") { handlePrivateApiLogin() }
-                                    .buttonStyle(.borderedProminent).tint(.accentColor)
+                                    .buttonStyle(.borderedProminent).interactiveCursor(.clickable).tint(.accentColor)
                             }
                         }.padding()
                     }
@@ -7660,7 +7661,7 @@ struct EyeBreakRecommendationsView: View {
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
 
             ScrollView {
@@ -7705,7 +7706,7 @@ struct EyeBreakRecommendationsView: View {
             Button("Got it") {
                 presentationMode.wrappedValue.dismiss()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             .frame(maxWidth: .infinity)
         }
         .padding()
@@ -7818,7 +7819,7 @@ struct EyeBreakSettingsView: View {
                         Button("Skip") {
                             eyeBreakManager.dismissBreak()
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .foregroundColor(.secondary)
                         .padding(8)
                         .background(Color.secondary.opacity(0.1))
@@ -7827,7 +7828,7 @@ struct EyeBreakSettingsView: View {
                         Button("Complete Break") {
                             eyeBreakManager.completeBreak()
                         }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.borderless).interactiveCursor(.clickable)
                         .foregroundColor(.white)
                         .padding(8)
                         .background(Color.blue)
@@ -7900,7 +7901,7 @@ struct EyeBreakSettingsView: View {
                     Button("Learn More") {
                         showingRecommendationsSheet = true
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .font(.caption)
                     .foregroundColor(.blue)
                     .padding(.top, 4)
@@ -7997,7 +7998,7 @@ struct EyeBreakSettingsView: View {
                 }
                 .padding()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             Divider().padding(.horizontal)
 
@@ -8014,7 +8015,7 @@ struct EyeBreakSettingsView: View {
                 }
                 .padding()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
         .modifier(SettingsContainerModifier())
     }
@@ -8170,7 +8171,7 @@ struct EyeBreakGraphView: View {
                 HStack(spacing: 12) {
                     ForEach(summaries) { summary in
                         DailySummaryCard(summary: summary, isSelected: selectedSummary?.id == summary.id)
-                            .onTapGesture {
+                            .interactiveCursor(.clickable).onTapGesture {
                                 selectedDayName = summary.dayName
                             }
                     }
@@ -8565,7 +8566,7 @@ struct AboutSettingsView: View {
                         }
                         .padding(.trailing, 10)
                         .contentShape(Rectangle())
-                        .onTapGesture { handleDebugIconTap() }
+                        .interactiveCursor(.clickable).onTapGesture { handleDebugIconTap() }
                         .help(debugMode.isEnabled ? "Debug mode is ON — tap 5× quickly to disable" : "Tap 5× quickly to enable debug mode")
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sapphire").font(.largeTitle.weight(.bold))
@@ -8588,7 +8589,7 @@ struct AboutSettingsView: View {
                                     .background(Color.blue)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(.sapphireInteractive())
 
                             Link(destination: ReleaseSource.repositoryURL) {
                                 Image("github_logo")
@@ -8601,7 +8602,7 @@ struct AboutSettingsView: View {
                                     .background(Color.black)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(.sapphireInteractive())
 
                             Link(destination: URL(string: "https://discord.gg/TdRjC2kNnU")!) {
                                 Image("discord_logo")
@@ -8612,7 +8613,7 @@ struct AboutSettingsView: View {
                                     .background(Color(red: 0.35, green: 0.40, blue: 0.95))
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(.sapphireInteractive())
                         }
                         .padding(.top, 6)
                     }
@@ -8635,7 +8636,7 @@ struct AboutSettingsView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 6)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                             .clipShape(Capsule())
 
                             Button {
@@ -8646,7 +8647,7 @@ struct AboutSettingsView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 6)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.bordered).interactiveCursor(.clickable)
                             .clipShape(Capsule())
 
                             Button {
@@ -8657,7 +8658,7 @@ struct AboutSettingsView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 6)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.bordered).interactiveCursor(.clickable)
                             .tint(.red)
                             .clipShape(Capsule())
                         }
@@ -8910,7 +8911,7 @@ struct ModernUpdateStatusView: View {
                         .clipShape(Capsule())
                         .shadow(color: .accentColor.opacity(0.4), radius: 8, y: 4)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
 
                     if canShowReleaseNotes {
                         releaseNotesButton
@@ -8944,7 +8945,7 @@ struct ModernUpdateStatusView: View {
                         .clipShape(Capsule())
                         .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     if canShowReleaseNotes {
                         releaseNotesButton
                     }
@@ -8987,7 +8988,7 @@ struct ModernUpdateStatusView: View {
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -9020,6 +9021,7 @@ private struct ReleaseNotesSheet: View {
                         Label("GitHub", systemImage: "arrow.up.right.square")
                             .font(.subheadline.weight(.medium))
                     }
+                    .interactiveCursor(.clickable)
                 }
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
@@ -9044,6 +9046,7 @@ private struct ReleaseNotesSheet: View {
                                 .foregroundStyle(.secondary)
                             if let url {
                                 Link("View on GitHub", destination: url)
+                                    .interactiveCursor(.clickable)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -9081,7 +9084,7 @@ struct DownloadingView: View {
             .frame(width: 300)
 
             Button("Cancel", action: onCancel)
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -9113,7 +9116,7 @@ struct ModernChannelSwitcher: View {
                         }
                     )
                     .contentShape(Capsule())
-                    .onTapGesture {
+                    .interactiveCursor(.clickable).onTapGesture {
                         guard !isLockedToRunningBuild else { return }
                         guard hasBetaAccess || channel == .stable else { return }
                         withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.85)) {
@@ -9327,7 +9330,7 @@ struct MenuBarAppearanceEditor: View {
                 Text("Menu Bar Tint").font(.headline)
                 Spacer()
                 Button("Reset", action: resetTintSettings)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .foregroundColor(.secondary)
             }
             .padding([.top, .horizontal])
@@ -9412,7 +9415,7 @@ struct MenuBarAppearanceEditor: View {
                             }
                         }) {
                             Image(systemName: "minus.circle.fill").foregroundColor(.red)
-                        }.buttonStyle(.plain).disabled(settings.settings.menuBarGradientColors.count <= 1)
+                        }.buttonStyle(.sapphireInteractive()).disabled(settings.settings.menuBarGradientColors.count <= 1)
                     }
                     Slider(value: $color.location, in: 0...1) { Text("Location") }
                 }.padding(.horizontal)
@@ -9428,7 +9431,7 @@ struct MenuBarAppearanceEditor: View {
                     Image(systemName: "plus.circle.fill")
                     Text("Add Color Stop")
                 }
-            }.buttonStyle(.plain).tint(.accentColor).padding([.top, .horizontal])
+            }.buttonStyle(.sapphireInteractive()).tint(.accentColor).padding([.top, .horizontal])
         }
         .padding(.vertical)
         .transition(.opacity)
@@ -9468,7 +9471,7 @@ struct MenuBarAppearanceSettingsView: View {
                 }
                 Spacer()
                 Button("Reset All", action: resetAllAppearanceSettings)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
             }
 
             MenuBarAppearanceEditor()
@@ -9569,7 +9572,7 @@ struct MenuBarSpacingSettingsView: View {
                     Button("Apply & Refresh Menu Bar") {
                         spacingManager.applyChanges()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                 }
                 .padding()
 
@@ -9611,7 +9614,7 @@ struct ControlItemIconPreview: View {
                 .frame(width: 70)
         }
         .contentShape(Rectangle())
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             onSelect()
         }
         .onHover { hovering in
@@ -9656,6 +9659,7 @@ extension View {
             Rectangle()
                 .fill(.clear)
                 .contentShape(Rectangle())
+                .interactiveCursor(.resizeHorizontal)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -9701,7 +9705,7 @@ struct ModernSegmentedPicker: View {
                     )
                     .foregroundColor(selection == option ? .primary : .secondary)
                     .contentShape(Rectangle())
-                    .onTapGesture {
+                    .interactiveCursor(.clickable).onTapGesture {
                         withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.7)) {
                             selection = option
                         }
@@ -9772,7 +9776,7 @@ struct IntelligenceRunnerView: View {
                         Image(systemName: "stop.fill")
                             .foregroundStyle(.red)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .frame(width: 32, height: 32)
                     .background(Color.red.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -9788,7 +9792,7 @@ struct IntelligenceRunnerView: View {
                         Image(systemName: "play.fill")
                             .foregroundStyle(.white)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .frame(width: 32, height: 32)
                     .background(isLaunchDisabled ? Color.gray.opacity(0.3) : Color.blue)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -9801,7 +9805,7 @@ struct IntelligenceRunnerView: View {
                     Image(systemName: isRunningScreenshotDebug ? "camera.fill" : "camera")
                         .foregroundStyle(isRunningScreenshotDebug ? .yellow : .white)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .frame(width: 32, height: 32)
                 .background(Color.orange.opacity(0.18))
                 .clipShape(RoundedRectangle(cornerRadius: 8))

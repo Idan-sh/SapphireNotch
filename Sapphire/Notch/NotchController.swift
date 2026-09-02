@@ -976,7 +976,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
                             .padding(.leading, NotchConfiguration.navHeaderLeadingPadding + 10)
                     }
                     .padding(.top, NotchConfiguration.navHeaderTopPadding)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
 
                     if currentMode == .musicPlayer, musicWidget.activeMediaSources.count > 1 {
                         NotchMediaSourceSwitcher()
@@ -1106,7 +1106,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             .background(isGeminiHovered ? (isLiveRunning ? stopGradient : activeGradient) : nil)
             .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .onHover { hovering in
             withAnimation(.spring(
                 response: NotchConfiguration.geminiButtonSpringResponse,
@@ -1146,7 +1146,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
                         .fill(Color.black.opacity(0.25))
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
     }
 
@@ -2586,7 +2586,7 @@ fileprivate struct SubtleIconButton: View {
                 .padding(.vertical, verticalPadding)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering }
         }

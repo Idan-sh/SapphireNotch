@@ -220,7 +220,7 @@ private struct AudioResetRow: View {
             }
             Spacer(minLength: 8)
             Button(buttonTitle, action: action)
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered).interactiveCursor(.clickable)
                 .tint(buttonColor)
         }
         .padding(.horizontal, 16)

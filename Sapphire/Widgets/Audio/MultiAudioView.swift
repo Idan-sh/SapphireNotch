@@ -91,7 +91,7 @@ struct SystemAudioPanel: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .background(selectedTab == tab ? Color.accentColor : Color.white.opacity(0.06))
         .foregroundColor(selectedTab == tab ? .white : .primary)
         .clipShape(Capsule())
@@ -279,7 +279,7 @@ fileprivate struct DeviceControlCard: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(getBg()))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(getBorder(), lineWidth: isExplicitlySelected ? 1.5 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture {
+        .interactiveCursor(.clickable).onTapGesture {
             if device.isOutput { onSelect() }
             else {
                 let next = !MultiAudioManager.shared.areAllInputsMuted
@@ -320,7 +320,7 @@ fileprivate struct SmallIconButton: View {
             Image(systemName: icon).font(.system(size: 11, weight: .bold)).frame(width: 32, height: 32)
                 .background(active ? (destructive ? Color.red : Color.accentColor) : (destructive ? Color.red.opacity(0.1) : Color.white.opacity(0.08)))
                 .foregroundColor(active ? .white : (destructive ? .red : .primary)).clipShape(Circle())
-        }.buttonStyle(.plain).scaleEffect(active ? 1.05 : 1.0)
+        }.buttonStyle(.sapphireInteractive()).scaleEffect(active ? 1.05 : 1.0)
     }
 }
 
@@ -346,6 +346,7 @@ fileprivate struct BoldPillSlider: View {
                     textView.foregroundColor(.white)
                 }.mask(Rectangle().frame(width: width * min(max(progress, 0), 1)).frame(maxWidth: .infinity, alignment: .leading))
             }.clipShape(Capsule()).contentShape(Capsule())
+            .interactiveCursor(.resizeHorizontal)
             .gesture(DragGesture(minimumDistance: 0).onChanged { v in
                 let percentage = Double(v.location.x / width)
                 value = min(max((range.upperBound - range.lowerBound) * percentage + range.lowerBound, range.lowerBound), range.upperBound)

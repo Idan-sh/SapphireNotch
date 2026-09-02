@@ -20,7 +20,7 @@ struct GeminiActiveActivityViewRight: View {
                 .foregroundStyle(isMuted ? .white.opacity(0.7) : .red)
                 .contentTransition(.symbolEffect(.replace))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .foregroundStyle(.white.opacity(0.9))
     }
 }

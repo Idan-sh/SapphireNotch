@@ -238,7 +238,7 @@ private struct FileShelfItemView: View {
     var body: some View {
         VStack(spacing: 6) {
             thumbnailView
-                .onTapGesture { onSelect(item) }
+                .interactiveCursor(.clickable).onTapGesture { onSelect(item) }
 
             Text(item.fileName)
                 .font(.system(size: 12))
@@ -282,7 +282,7 @@ private struct FileShelfItemView: View {
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(.white, .red)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .offset(x: 5, y: -5)
                 .transition(.scale.animation(.spring(response: 0.2, dampingFraction: 0.6)))
             }

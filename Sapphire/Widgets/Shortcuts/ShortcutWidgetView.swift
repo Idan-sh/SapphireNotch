@@ -63,7 +63,7 @@ fileprivate struct ShortcutIconView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .help(shortcut.name)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .onAppear {
             self.iconImage = ShortcutsManager.shared.getIcon(for: shortcut)
         }

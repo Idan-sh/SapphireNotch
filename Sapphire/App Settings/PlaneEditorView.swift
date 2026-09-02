@@ -62,7 +62,7 @@ struct PlaneEditorView: View {
                             Text("Record Shortcut")
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 }
             }
             .textFieldStyle(.roundedBorder)

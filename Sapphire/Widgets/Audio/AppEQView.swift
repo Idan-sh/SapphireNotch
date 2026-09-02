@@ -181,6 +181,7 @@ fileprivate struct ModernGlassSlider: View {
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
             .contentShape(Capsule())
+            .interactiveCursor(.resizeHorizontal)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in

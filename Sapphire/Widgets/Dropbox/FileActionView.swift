@@ -70,7 +70,7 @@ struct FileActionView: View {
                         .background(.white.opacity(0.15))
                         .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
             }
             .padding(15)
         }
@@ -99,7 +99,7 @@ private struct ActionButton: View {
             .background(.white.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -119,7 +119,7 @@ private struct ConversionButton: View {
             .background(.white.opacity(0.1))
             .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
     }
 }
 

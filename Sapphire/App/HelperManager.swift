@@ -130,7 +130,7 @@ struct HelperStatusBanner: View {
                     Button("Instructions") {
                         HelperAlertPresenter.present(issue)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 }
 
                 if !helperManager.isRunning {
@@ -139,31 +139,31 @@ struct HelperStatusBanner: View {
                             helperManager.resetOwnBackgroundActivity()
                         }
                         .disabled(helperManager.isResettingHelper)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         .tint(.orange)
                     } else if helperManager.status == .notFound {
                         Button(helperManager.isResettingHelper ? "Resetting…" : "Reset Helper") {
                             helperManager.resetOwnBackgroundActivity()
                         }
                         .disabled(helperManager.isResettingHelper)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         .tint(.orange)
                         Button("Relaunch") {
                             HelperManager.relaunchApp()
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered).interactiveCursor(.clickable)
                     } else if helperManager.status == .requiresApproval {
                         Button("Open Login Items") {
                             SMAppService.openSystemSettingsLoginItems()
                             helperManager.beginInstallation()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         .tint(.orange)
                     } else if helperManager.status != .enabled {
                         Button("Install") {
                             helperManager.beginInstallation()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                         .tint(.accentColor)
                     }
                 }

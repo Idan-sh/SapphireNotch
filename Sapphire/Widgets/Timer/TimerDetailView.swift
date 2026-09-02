@@ -36,7 +36,7 @@ struct TimerDetailView: View {
 
                             }
                             .font(.system(.body, design: .monospaced).weight(.medium))
-                            .buttonStyle(.plain)
+                            .buttonStyle(.sapphireInteractive())
                             .font(.title3)
                         }
                     }

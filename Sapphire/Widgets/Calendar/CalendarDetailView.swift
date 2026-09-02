@@ -140,7 +140,7 @@ struct CalendarDetailView: View {
             .padding(.vertical, 6)
             .background(Color.black.opacity(0.2))
             .clipShape(Capsule())
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
         }
     }
 
@@ -166,7 +166,7 @@ struct CalendarDetailView: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .interactiveCursor(.clickable).onTapGesture {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { viewModel.selectDate(date) }
                 }
             }
@@ -204,7 +204,7 @@ struct CalendarDetailView: View {
                             }
                         }
                         .contentShape(Rectangle())
-                        .onTapGesture {
+                        .interactiveCursor(.clickable).onTapGesture {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                 viewModel.selectDate(item.date)
                                 isMonthlyView = false

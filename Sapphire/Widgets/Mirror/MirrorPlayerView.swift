@@ -124,7 +124,7 @@ struct MirrorPlayerView: View {
                 .background(.black.opacity(0.28), in: Circle())
                 .overlay(Circle().stroke(.white.opacity(0.12), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help(help)
     }
 
@@ -140,7 +140,7 @@ struct MirrorPlayerView: View {
                 .background(Color.red.opacity(0.85), in: Capsule())
                 .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help("Turn camera off")
     }
 
@@ -160,7 +160,7 @@ struct MirrorPlayerView: View {
                 .background(.black.opacity(0.28), in: Circle())
                 .overlay(Circle().stroke(.white.opacity(0.12), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help("Close and stop camera")
     }
 
@@ -203,7 +203,7 @@ struct MirrorPlayerView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                 .tint(camera.isDenied ? Color.red : Color.indigo)
                 .disabled(camera.isDenied)
 
@@ -211,12 +211,12 @@ struct MirrorPlayerView: View {
                     Button("Open Privacy Settings") {
                         camera.openSystemPrivacySettings()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 } else if camera.isError {
                     Button("Retry") {
                         camera.start()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 }
             }
         }
@@ -280,7 +280,7 @@ struct MirrorFullscreenView: View {
                                 .frame(width: 34, height: 34)
                                 .background(.black.opacity(0.5), in: Circle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .help("Flip horizontally")
 
                         Button {
@@ -293,7 +293,7 @@ struct MirrorFullscreenView: View {
                                 .padding(.vertical, 8)
                                 .background(Color.red.opacity(0.85), in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.sapphireInteractive())
                         .help("Turn camera off")
                     }
 
@@ -306,7 +306,7 @@ struct MirrorFullscreenView: View {
                             .frame(width: 34, height: 34)
                             .background(.black.opacity(0.5), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .help("Exit fullscreen")
                 }
                 .padding(16)

@@ -85,6 +85,7 @@ struct WindowDragHandle: View {
             Color.clear
                 .frame(height: 50)
                 .contentShape(Rectangle())
+                .interactiveCursor(.draggable)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in

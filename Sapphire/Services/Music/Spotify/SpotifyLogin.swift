@@ -20,7 +20,9 @@ struct SpotifyLoginWebView: View {
 
             SpotifyLoginWebViewRepresentable(onComplete: onComplete)
 
-            Button("Cancel", action: onCancel).padding()
+            Button("Cancel", action: onCancel)
+                .buttonStyle(.sapphireInteractive())
+                .padding()
         }
         .frame(width: 800, height: 700)
     }

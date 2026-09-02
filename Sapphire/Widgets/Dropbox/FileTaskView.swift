@@ -414,7 +414,7 @@ private struct HeaderView: View {
                 Image(systemName: "tray.2.fill")
                     .font(.system(size: 16, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .foregroundColor(.secondary)
         }
         .padding(16)
@@ -495,7 +495,7 @@ private struct LocalFileRowView: View {
                             .symbolRenderingMode(.palette)
                             .foregroundStyle(.white, .red)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.sapphireInteractive())
                     .offset(x: 4, y: -4)
                     .transition(.scale.animation(.spring(response: 0.2, dampingFraction: 0.6)))
                 }
@@ -719,6 +719,7 @@ private struct ModernIconActionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .interactiveCursor(.clickable)
             .font(.system(size: 14, weight: .semibold))
             .foregroundColor(isProminent ? .white : .primary)
             .frame(width: 32, height: 32)

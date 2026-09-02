@@ -27,7 +27,7 @@ struct LayoutEditorView: View {
                     onSave(layout)
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
                 .controlSize(.large)
                 .disabled($layout.name.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .keyboardShortcut(.defaultAction)
@@ -51,7 +51,7 @@ struct LayoutEditorView: View {
                                 canvasSize: geometry.size,
                                 allZones: layout.zones
                             )
-                            .onTapGesture {
+                            .interactiveCursor(.clickable).onTapGesture {
                                 selectedZoneID = zone.id
                             }
                         }
@@ -73,14 +73,14 @@ struct LayoutEditorView: View {
                     layout.zones.append(newZone)
                     selectedZoneID = newZone.id
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered).interactiveCursor(.clickable)
 
                 if selectedZoneID != nil {
                     Button("Remove Selected", role: .destructive) {
                         layout.zones.removeAll { $0.id == selectedZoneID }
                         selectedZoneID = nil
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered).interactiveCursor(.clickable)
                 }
             }
             .controlSize(.large)

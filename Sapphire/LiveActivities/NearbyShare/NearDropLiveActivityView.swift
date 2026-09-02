@@ -212,6 +212,7 @@ private struct ModernIconActionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .interactiveCursor(.clickable)
             .font(.system(size: 16, weight: .semibold))
             .foregroundColor(foregroundColor)
             .frame(width: 36, height: 36)

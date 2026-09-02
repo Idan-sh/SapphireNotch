@@ -54,11 +54,11 @@ struct BatteryDebugMenu: View {
             Button("Refresh All") {
                 Task { await refreshEverything() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered).interactiveCursor(.clickable)
             Button(debugMode.isEnabled ? "Disable Debug Mode" : "Enable Debug Mode") {
                 debugMode.isEnabled.toggle()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).interactiveCursor(.clickable)
             .tint(.orange)
         }
         .padding(.top, 8)
@@ -97,7 +97,7 @@ struct BatteryDebugMenu: View {
                     helperManager.resetOwnBackgroundActivity()
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered).interactiveCursor(.clickable)
             .controlSize(.small)
         }
         .debugCard()
@@ -173,7 +173,7 @@ struct BatteryDebugMenu: View {
                     appendLog("setDischarge(false)")
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered).interactiveCursor(.clickable)
             .controlSize(.small)
 
             HStack(spacing: 8) {
@@ -185,7 +185,7 @@ struct BatteryDebugMenu: View {
                     BatteryManager.shared.setChargeLimit(limitInput)
                     appendLog("setChargeLimit(\(limitInput))")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered).interactiveCursor(.clickable)
                 .controlSize(.small)
             }
 
@@ -211,7 +211,7 @@ struct BatteryDebugMenu: View {
                     appendLog("toggled low power mode")
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered).interactiveCursor(.clickable)
             .controlSize(.small)
         }
         .debugCard()
@@ -240,7 +240,7 @@ struct BatteryDebugMenu: View {
                     Task { await loadHardwarePercent() }
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered).interactiveCursor(.clickable)
             .controlSize(.small)
 
             if !smcKeys.isEmpty {
@@ -281,7 +281,7 @@ struct BatteryDebugMenu: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             Button("Clear Log") { log.removeAll() }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered).interactiveCursor(.clickable)
                 .controlSize(.small)
         }
         .debugCard()

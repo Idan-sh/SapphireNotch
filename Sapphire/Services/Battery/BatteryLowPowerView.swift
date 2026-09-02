@@ -51,7 +51,7 @@ struct BatteryLowPowerView: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .padding(.horizontal, 10)
             .padding(12)
             .padding(.top, 0)
@@ -62,7 +62,7 @@ struct BatteryLowPowerView: View {
                     .foregroundColor(.secondary.opacity(0.6))
                     .symbolRenderingMode(.hierarchical)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .padding(.top, 6)
             .padding(.trailing, 6)
 

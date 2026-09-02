@@ -80,7 +80,7 @@ struct MirrorWidgetView: View {
                     Circle().stroke(.white.opacity(0.18), lineWidth: 0.5)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sapphireInteractive())
         .help("Stop camera")
     }
 

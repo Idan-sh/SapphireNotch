@@ -24,7 +24,7 @@ struct RoundedPillSwitcher<Item: Hashable>: View {
                             .fill(selection == item ? Color.white.opacity(0.2) : Color.clear)
                     )
                     .contentShape(Capsule())
-                    .onTapGesture {
+                    .interactiveCursor(.clickable).onTapGesture {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                             selection = item
                         }

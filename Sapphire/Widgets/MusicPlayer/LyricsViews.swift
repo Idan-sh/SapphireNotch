@@ -186,7 +186,7 @@ struct LyricsView: View {
                 }
                 .font(.system(size: 8, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
             .foregroundStyle(.secondary)
         }
     }
@@ -268,11 +268,11 @@ struct LyricsDetachedWindowView: View {
                 HStack(spacing: 14) {
                     HStack(spacing: 8) {
                         Circle().fill(Color(nsColor: .systemRed)).frame(width: 12, height: 12)
-                            .onTapGesture { hostingWindow?.performClose(nil) }
+                            .interactiveCursor(.clickable).onTapGesture { hostingWindow?.performClose(nil) }
                         Circle().fill(Color(nsColor: .systemYellow)).frame(width: 12, height: 12)
-                            .onTapGesture { hostingWindow?.miniaturize(nil) }
+                            .interactiveCursor(.clickable).onTapGesture { hostingWindow?.miniaturize(nil) }
                         Circle().fill(Color(nsColor: .systemGreen)).frame(width: 12, height: 12)
-                            .onTapGesture { hostingWindow?.zoom(nil) }
+                            .interactiveCursor(.clickable).onTapGesture { hostingWindow?.zoom(nil) }
                     }
                     Spacer()
                 }
@@ -565,7 +565,7 @@ private struct LyricsDetachedBottomBar: View {
                         .frame(width: 44, height: 44)
                         .contentTransition(.symbolEffect(.replace, options: .speed(1.8)))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sapphireInteractive())
                 .scaleEffect(musicManager.isPlaying ? 1.0 : 0.95)
                 .animation(.easeInOut(duration: 0.08), value: musicManager.isPlaying)
                 .animation(.easeInOut(duration: 0.08), value: holdFeedbackIcon)

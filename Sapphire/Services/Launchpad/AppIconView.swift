@@ -310,7 +310,7 @@ struct DeleteButton: View {
                 Circle().fill(.black.opacity(0.5))
                 Image(systemName: "xmark").font(.system(size: 10, weight: .bold, design: .rounded)).foregroundColor(.white)
             }.frame(width: 20, height: 20)
-        }.buttonStyle(.plain)
+        }.buttonStyle(.sapphireInteractive())
     }
 }
 
@@ -445,7 +445,7 @@ struct LaunchpadView: View {
         ZStack {
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .interactiveCursor(.clickable).onTapGesture {
                     if isJiggleMode { isJiggleMode = false }
                     else if openedFolder != nil { withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { openedFolder = nil } }
                     else { NotificationCenter.default.post(name: .requestCloseLaunchpad, object: nil) }
@@ -653,7 +653,7 @@ struct LaunchpadView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .ignoresSafeArea()
-                .onTapGesture {
+                .interactiveCursor(.clickable).onTapGesture {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         openedFolder = nil
                     }
@@ -666,7 +666,7 @@ struct LaunchpadView: View {
                         ForEach(folder.items) { item in
                             if let app = viewModel.getApp(for: item) {
                                 AppIconView(app: app, isHovered: false)
-                                    .onTapGesture {
+                                    .interactiveCursor(.clickable).onTapGesture {
                                         if NSWorkspace.shared.launchApplication(app.name) {
                                             openedFolder = nil
                                             NotificationCenter.default.post(name: .requestCloseLaunchpad, object: nil)
@@ -735,7 +735,7 @@ struct LaunchpadView: View {
                 LazyVGrid(columns: columns, spacing: gridMetrics.verticalSpacing) {
                     ForEach(viewModel.filteredApps) { app in
                         AppIconView(app: app, isHovered: false)
-                            .onTapGesture {
+                            .interactiveCursor(.clickable).onTapGesture {
                                 if NSWorkspace.shared.launchApplication(app.name) {
                                     NotificationCenter.default.post(name: .requestCloseLaunchpad, object: nil)
                                 }
@@ -785,7 +785,7 @@ struct LaunchpadView: View {
                     .fill(Color.white.opacity(index == viewModel.currentPage ? 0.8 : 0.3))
                     .frame(width: 7, height: 7)
                     .animation(.spring(), value: viewModel.currentPage)
-                    .onTapGesture { withAnimation(.spring()) { viewModel.currentPage = index } }
+                    .interactiveCursor(.clickable).onTapGesture { withAnimation(.spring()) { viewModel.currentPage = index } }
             }
         }
     }
