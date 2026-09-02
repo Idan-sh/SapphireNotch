@@ -485,19 +485,19 @@ struct AlbumArtView: View {
     @EnvironmentObject var musicWidget: MusicManager
 
     var body: some View {
-        Group {
-            if let image = (musicWidget.artwork ?? musicWidget.appIcon) {
-                Image(nsImage: image)
-                    .resizable()
-            } else {
-                Color.clear
+        ArtworkCrossfade(token: musicWidget.currentTrackArtworkToken) {
+            Group {
+                if let image = (musicWidget.artwork ?? musicWidget.appIcon) {
+                    Image(nsImage: image)
+                        .resizable()
+                } else {
+                    Color.clear
+                }
             }
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 20, height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .aspectRatio(contentMode: .fill)
-        .frame(width: 20, height: 20)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .id(musicWidget.currentTrackArtworkToken)
-        .animation(nil, value: musicWidget.currentTrackArtworkToken)
         .onHover { isHovering in
             musicWidget.isHoveringAlbumArt = isHovering
         }
@@ -505,19 +505,23 @@ struct AlbumArtView: View {
 }
 
 struct QuickPeekView: View {
+    @EnvironmentObject var musicWidget: MusicManager
     let title: String
     let artist: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title + " · " + artist!)
-                .font(.system(size: 10, weight: .regular, design: .rounded))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .opacity(0.6)
+        TrackMetadataTransition(
+            identity: "peek-\(title)-\(artist ?? "")-\(musicWidget.uri ?? "")"
+        ) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title + " · " + (artist ?? ""))
+                    .font(.system(size: 10, weight: .regular, design: .rounded))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .opacity(0.6)
+            }
+            .frame(maxWidth: 200)
         }
-        .frame(maxWidth: 200)
-        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
     }
 }
 

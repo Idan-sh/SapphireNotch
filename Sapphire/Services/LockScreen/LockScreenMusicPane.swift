@@ -312,44 +312,51 @@ struct LockScreenFullScreenMusicPane: View {
 
     private var playerLayout: some View {
         VStack(spacing: 28) {
-            Group {
-                if let cover = musicManager.artwork ?? musicManager.appIcon {
-                    Image(nsImage: cover)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    ZStack {
-                        Color.white.opacity(0.08)
-                        Image(systemName: "music.note")
-                            .font(.system(size: 72, weight: .light))
-                            .foregroundStyle(.white.opacity(0.35))
+            ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                Group {
+                    if let cover = musicManager.artwork ?? musicManager.appIcon {
+                        Image(nsImage: cover)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        ZStack {
+                            Color.white.opacity(0.08)
+                            Image(systemName: "music.note")
+                                .font(.system(size: 72, weight: .light))
+                                .foregroundStyle(.white.opacity(0.35))
+                        }
                     }
                 }
+                .frame(width: 320, height: 320)
+                .clipShape(RoundedRectangle(cornerRadius: isAnimatingIn ? 28 : 14, style: .continuous))
+                .shadow(color: musicManager.accentColor.opacity(0.45), radius: 36, y: 18)
             }
-            .frame(width: 320, height: 320)
-            .clipShape(RoundedRectangle(cornerRadius: isAnimatingIn ? 28 : 14, style: .continuous))
-            .shadow(color: musicManager.accentColor.opacity(0.45), radius: 36, y: 18)
             .scaleEffect(isAnimatingIn ? 1.0 : 0.18)
             .opacity(isAnimatingIn ? 1.0 : 0.55)
             .animation(.spring(response: 0.52, dampingFraction: 0.76), value: isAnimatingIn)
 
-            VStack(spacing: 8) {
-                Text(musicManager.title ?? "Not Playing")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+            TrackMetadataTransition(
+                identity: "lock-player-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")",
+                alignment: .center
+            ) {
+                VStack(spacing: 8) {
+                    Text(musicManager.title ?? "Not Playing")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
 
-                Text(musicManager.artist ?? "Unknown Artist")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .lineLimit(1)
-
-                if let album = musicManager.album, !album.isEmpty, album != musicManager.title {
-                    Text(album)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.35))
+                    Text(musicManager.artist ?? "Unknown Artist")
+                        .font(.system(size: 20, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
+
+                    if let album = musicManager.album, !album.isEmpty, album != musicManager.title {
+                        Text(album)
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.35))
+                            .lineLimit(1)
+                    }
                 }
             }
             .frame(maxWidth: 560)
@@ -362,28 +369,34 @@ struct LockScreenFullScreenMusicPane: View {
     private var lyricsLayout: some View {
         HStack(alignment: .center, spacing: 56) {
             VStack(alignment: .leading, spacing: 20) {
-                Group {
-                    if let cover = musicManager.artwork ?? musicManager.appIcon {
-                        Image(nsImage: cover)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Color.white.opacity(0.08)
+                ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                    Group {
+                        if let cover = musicManager.artwork ?? musicManager.appIcon {
+                            Image(nsImage: cover)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Color.white.opacity(0.08)
+                        }
                     }
+                    .frame(width: 300, height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .shadow(color: musicManager.accentColor.opacity(0.4), radius: 28, y: 14)
                 }
-                .frame(width: 300, height: 300)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: musicManager.accentColor.opacity(0.4), radius: 28, y: 14)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(musicManager.title ?? "Not Playing")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    Text(musicManager.artist ?? "Unknown Artist")
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(1)
+                TrackMetadataTransition(
+                    identity: "lock-lyrics-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+                ) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(musicManager.title ?? "Not Playing")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        Text(musicManager.artist ?? "Unknown Artist")
+                            .font(.system(size: 17, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
                 }
             }
             .frame(width: 320, alignment: .leading)

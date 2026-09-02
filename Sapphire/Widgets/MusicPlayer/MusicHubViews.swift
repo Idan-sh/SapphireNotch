@@ -504,39 +504,47 @@ struct QueueAndPlaylistsView: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
-                    if let artwork = musicManager.artwork {
-                        Image(nsImage: artwork)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 88, height: 88)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .shadow(color: musicManager.accentColor.opacity(0.3), radius: 8, y: 4)
+                    if musicManager.artwork != nil || musicManager.appIcon != nil {
+                        ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                            if let artwork = musicManager.artwork ?? musicManager.appIcon {
+                                Image(nsImage: artwork)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 88, height: 88)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .shadow(color: musicManager.accentColor.opacity(0.3), radius: 8, y: 4)
+                            }
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(musicManager.title ?? "Not Playing")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .lineLimit(2)
-                            Text(musicManager.artist ?? "Apple Music")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            if let album = musicManager.album, !album.isEmpty,
-                               album != musicManager.title {
-                                Text(album)
-                                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.tertiary)
+                        TrackMetadataTransition(
+                            identity: "hub-apple-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+                        ) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(musicManager.title ?? "Not Playing")
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .lineLimit(2)
+                                Text(musicManager.artist ?? "Apple Music")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                                if let album = musicManager.album, !album.isEmpty,
+                                   album != musicManager.title {
+                                    Text(album)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.tertiary)
+                                        .lineLimit(1)
+                                }
                             }
                         }
 
-                        HStack(spacing: 10) {
-                            Button {
-                                Task {
-                                    await musicManager.toggleLike()
-                                    refreshData()
-                                }
+                            HStack(spacing: 10) {
+                                Button {
+                                    Task {
+                                        await musicManager.toggleLike()
+                                        refreshData()
+                                    }
                             } label: {
                                 Image(systemName: musicManager.isLiked ? "heart.fill" : "heart")
                                     .font(.system(size: 13))
@@ -662,21 +670,29 @@ struct QueueAndPlaylistsView: View {
     private var nativeQueueBootstrappingView: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(musicManager.title ?? "Now Playing")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .lineLimit(2)
-                    Text(musicManager.artist ?? "Spotify")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                TrackMetadataTransition(
+                    identity: "hub-boot-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+                ) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(musicManager.title ?? "Now Playing")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .lineLimit(2)
+                        Text(musicManager.artist ?? "Spotify")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
-                if let artwork = musicManager.artwork {
-                    Image(nsImage: artwork)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 88, height: 88)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                if musicManager.artwork != nil {
+                    ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                        if let artwork = musicManager.artwork {
+                            Image(nsImage: artwork)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 88, height: 88)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                    }
                 }
                 ActionButtonsView(onAction: refreshData, longPressNavigation: hubLongPressNavigation)
             }
@@ -843,34 +859,40 @@ struct QueueAndPlaylistsView: View {
 
     private func nowPlayingHeroCard(_ nowPlaying: PlayerState.Track) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(nowPlaying.metadata?.title ?? "Unknown Track")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .lineLimit(2)
+            TrackMetadataTransition(
+                identity: "hub-hero-\(nowPlaying.uri)-\(nowPlaying.metadata?.title ?? "")"
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(nowPlaying.metadata?.title ?? "Unknown Track")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .lineLimit(2)
 
-                Button {
-                    openArtistFromNowPlaying(fallbackName: nowPlaying.metadata?.artistName)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(nowPlaying.metadata?.artistName ?? "Unknown Artist")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.tertiary)
+                    Button {
+                        openArtistFromNowPlaying(fallbackName: nowPlaying.metadata?.artistName)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(nowPlaying.metadata?.artistName ?? "Unknown Artist")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    .buttonStyle(.sapphireInteractive())
+                    .disabled(musicManager.currentSpotifyArtistNavigation() == nil
+                              && (nowPlaying.metadata?.artistUri?.isEmpty ?? true))
                 }
-                .buttonStyle(.sapphireInteractive())
-                .disabled(musicManager.currentSpotifyArtistNavigation() == nil
-                          && (nowPlaying.metadata?.artistUri?.isEmpty ?? true))
             }
 
             HStack(alignment: .center, spacing: 14) {
-                CachedAsyncImage(url: nowPlaying.metadata?.imageURL) { $0.resizable().aspectRatio(contentMode: .fill) }
-                    placeholder: { ZStack { MaterialChartPalette.surfaceVariant; Image(systemName: "music.note") } }
-                    .frame(width: 88, height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                ArtworkCrossfade(token: nowPlaying.uri) {
+                    CachedAsyncImage(url: nowPlaying.metadata?.imageURL) { $0.resizable().aspectRatio(contentMode: .fill) }
+                        placeholder: { ZStack { MaterialChartPalette.surfaceVariant; Image(systemName: "music.note") } }
+                        .frame(width: 88, height: 88)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     ActiveDeviceView()

@@ -207,6 +207,11 @@ class MusicManager: ObservableObject {
     @Published var isWaveformAnimating: Bool = false
     @Published private(set) var lastKnownBundleID: String?
     @Published private(set) var currentTrackArtworkToken: String = ""
+    @Published private(set) var trackTransitionDirection: TrackTransitionDirection = .neutral
+    /// Stable identity for metadata slide animations. Updated only when a track
+    /// transition is published so staged title/album/uri fills do not re-slide.
+    @Published private(set) var trackTransitionToken: String = ""
+    @Published private(set) var trackTransitionEvent = TrackTransitionEvent()
     @Published var airplayDevices: [AirPlayDevice] = []
 
     @Published var activeMediaSources: [String: TrackInfo] = [:]
@@ -271,6 +276,10 @@ class MusicManager: ObservableObject {
     private var lastSpotifyConnectSyncAt: Date = .distantPast
     private var spotifyHydrationTask: Task<Void, Never>?
     private var spotifyHydrationInFlightURI: String?
+    private var pendingTrackTransitionDirection: TrackTransitionDirection?
+    private var expectedNextTrackURI: String?
+    private var lastPublishedTransitionURI: String?
+    private var lastPublishedTransitionFingerprint: String?
 
     private var lyricsCache: [String: [LyricLine]] = [:]
     private var needsLyricsUpdates: Bool {
@@ -328,6 +337,13 @@ class MusicManager: ObservableObject {
                     return
                 }
                 self.nativeQueue = queue
+            }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest($nativeQueue, $appleMusicNextTrack)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] queue, appleNext in
+                self?.refreshExpectedNextTrackURI(queue: queue, appleNext: appleNext)
             }
             .store(in: &cancellables)
 
@@ -505,21 +521,26 @@ class MusicManager: ObservableObject {
             fetchAppIcon(for: "com.spotify.client")
         }
         var identityChanged = false
+        var uriChanged = false
+        var pendingTitle: String?
+        var pendingArtist: String?
+        var pendingAlbum: String?
+
         if let title = track.metadata?.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
             if title != self.title {
-                self.title = title
+                pendingTitle = title
                 identityChanged = true
             }
         }
         if let artist = track.metadata?.artistName?.trimmingCharacters(in: .whitespacesAndNewlines), !artist.isEmpty {
             if artist != self.artist {
-                self.artist = artist
+                pendingArtist = artist
                 identityChanged = true
             }
         }
         if let album = track.metadata?.albumTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !album.isEmpty {
             if album != self.album {
-                self.album = album
+                pendingAlbum = album
                 identityChanged = true
             }
         }
@@ -529,12 +550,30 @@ class MusicManager: ObservableObject {
         if track.uri != self.uri {
             self.uri = track.uri
             identityChanged = true
+            uriChanged = true
         }
         if track.uri.contains("spotify:track:") {
             let id = track.uri.replacingOccurrences(of: "spotify:track:", with: "")
             if !id.isEmpty, trackID != id {
                 trackID = id
             }
+        }
+        if uriChanged {
+            // Apply title/artist/album inside the same animation transaction as the
+            // transition token so reverse skips don't slide "new text on both sides".
+            publishTrackTransition(
+                incomingURI: track.uri,
+                source: "syncConnectNowPlayingMetadata",
+                applying: TrackTransitionMetadata(
+                    title: pendingTitle ?? title,
+                    artist: pendingArtist ?? artist,
+                    album: pendingAlbum ?? album
+                )
+            )
+        } else {
+            if let pendingTitle { self.title = pendingTitle }
+            if let pendingArtist { self.artist = pendingArtist }
+            if let pendingAlbum { self.album = pendingAlbum }
         }
         if identityChanged {
             trackDidChange.send()
@@ -743,6 +782,7 @@ class MusicManager: ObservableObject {
     }
 
     func nextTrack() async {
+        pendingTrackTransitionDirection = .forward
         beginPlayStateHold(preferPlaying: true, duration: 1.2)
         if shouldUseSpotifyPlaybackControls {
             if await skipSpotifyViaConnectIfPossible(direction: .next) { return }
@@ -751,6 +791,7 @@ class MusicManager: ObservableObject {
     }
 
     func previousTrack() async {
+        pendingTrackTransitionDirection = .backward
         beginPlayStateHold(preferPlaying: true, duration: 1.2)
         if shouldUseSpotifyPlaybackControls {
             if await skipSpotifyViaConnectIfPossible(direction: .previous) { return }
@@ -1786,17 +1827,19 @@ class MusicManager: ObservableObject {
             lastHandledTrackKey = nil
         }
 
-        if let track, let head = nativeQueue.first, head.uri == track.uri || head.uid == track.uid {
-            var advanced = nativeQueue
-            advanced.removeFirst()
-            nativeQueue = advanced
-            spotifyPrivateAPI.nativeQueue = advanced
-        }
-
         guard let track else {
             lastNextSongFetchAttempt = .distantPast
             Task { await ensureNextSongAvailableIfNeeded(force: true) }
             return
+        }
+
+        publishTrackTransition(incomingURI: track.uri, source: "handleSpotifyTrackAdvanced")
+
+        if let head = nativeQueue.first, head.uri == track.uri || head.uid == track.uid {
+            var advanced = nativeQueue
+            advanced.removeFirst()
+            nativeQueue = advanced
+            spotifyPrivateAPI.nativeQueue = advanced
         }
 
         currentTrackArtworkToken = track.uri
@@ -1885,15 +1928,23 @@ class MusicManager: ObservableObject {
         let resolvedArtist: String? = (cleanArtist?.isEmpty == false) ? cleanArtist : nil
         let resolvedAlbum: String? = (cleanAlbum?.isEmpty == false) ? cleanAlbum : nil
 
-        if self.title != resolvedTitle { self.title = resolvedTitle }
-        if self.artist != resolvedArtist { self.artist = resolvedArtist }
-        if self.album != resolvedAlbum { self.album = resolvedAlbum }
-
         if hasTrackChanged {
             self.lastTrackIdentity = trackIdentity
             let fingerprint = mediaFingerprint(for: payload)
             self.lastMediaFingerprint = fingerprint.isEmpty ? nil : fingerprint
             self.currentTrackArtworkToken = trackIdentity
+            // Keep metadata + transition token in one transaction. Updating title
+            // before the token makes reverse next/prev slides look bidirectional-
+            // wrong because both sides already show the new title.
+            publishTrackTransition(
+                incomingURI: payload.contentItemIdentifier ?? self.uri ?? trackIdentity,
+                source: "applyTrackPayload",
+                applying: TrackTransitionMetadata(
+                    title: resolvedTitle,
+                    artist: resolvedArtist,
+                    album: resolvedAlbum
+                )
+            )
             self.resetLyricsState()
             self.triggerQuickPeek()
             self.lastTrackChangeDate = Date()
@@ -1929,6 +1980,10 @@ class MusicManager: ObservableObject {
                 Task { await self.fetchAndTranslateLyricsIfNeeded() }
             }
             self.trackDidChange.send()
+        } else {
+            if self.title != resolvedTitle { self.title = resolvedTitle }
+            if self.artist != resolvedArtist { self.artist = resolvedArtist }
+            if self.album != resolvedAlbum { self.album = resolvedAlbum }
         }
 
         if let newArtwork = payload.artwork {
@@ -2404,6 +2459,13 @@ class MusicManager: ObservableObject {
         lastTrackIdentity = nil
         lastMediaFingerprint = nil
         currentTrackArtworkToken = ""
+        pendingTrackTransitionDirection = nil
+        trackTransitionDirection = .neutral
+        trackTransitionToken = ""
+        trackTransitionEvent = TrackTransitionEvent()
+        expectedNextTrackURI = nil
+        lastPublishedTransitionURI = nil
+        lastPublishedTransitionFingerprint = nil
         self.uri = nil; self.trackID = nil; self.popularity = nil; self.playCount = nil; self.playCountValue = nil
         self.isPlaying = false; self.totalDuration = 0; self.currentElapsedTime = 0
         self.lastHandledTrackKey = nil
@@ -2499,6 +2561,79 @@ class MusicManager: ObservableObject {
         let incomingIdentity = trackIdentity(for: payload)
         if incomingIdentity == "unknown" { return false }
         return incomingIdentity != (lastTrackIdentity ?? "")
+    }
+
+    private struct TrackTransitionMetadata {
+        let title: String?
+        let artist: String?
+        let album: String?
+    }
+
+    private func publishTrackTransition(
+        incomingURI: String?,
+        source: String = "unknown",
+        applying metadata: TrackTransitionMetadata? = nil
+    ) {
+        let normalizedIncoming = TrackTransitionResolver.normalizeURI(incomingURI)
+        let fingerprint = [
+            metadata?.title ?? title,
+            metadata?.artist ?? artist
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "|")
+            .lowercased()
+
+        let sameURI = !normalizedIncoming.isEmpty && normalizedIncoming == lastPublishedTransitionURI
+        let sameFingerprint = !fingerprint.isEmpty && fingerprint == lastPublishedTransitionFingerprint
+        if pendingTrackTransitionDirection == nil, sameURI || sameFingerprint {
+            if let metadata {
+                if let title = metadata.title, title != self.title { self.title = title }
+                if let artist = metadata.artist, artist != self.artist { self.artist = artist }
+                if let album = metadata.album, album != self.album { self.album = album }
+            }
+            return
+        }
+
+        let resolved = TrackTransitionResolver.resolve(
+            pending: pendingTrackTransitionDirection,
+            incomingURI: incomingURI,
+            expectedNextURI: expectedNextTrackURI
+        )
+        pendingTrackTransitionDirection = nil
+        lastPublishedTransitionURI = normalizedIncoming.isEmpty ? nil : normalizedIncoming
+        lastPublishedTransitionFingerprint = fingerprint.isEmpty ? nil : fingerprint
+        let token = [
+            normalizedIncoming.isEmpty ? nil : normalizedIncoming,
+            fingerprint.isEmpty ? nil : fingerprint,
+            UUID().uuidString
+        ]
+            .compactMap { $0 }
+            .joined(separator: "|")
+
+        // Publish the slide token before metadata so the view can freeze the
+        // outgoing pane, then update title/artist for the incoming pane.
+        trackTransitionDirection = resolved
+        trackTransitionToken = token
+        trackTransitionEvent = TrackTransitionEvent(token: token, direction: resolved)
+        if let metadata {
+            if let title = metadata.title { self.title = title }
+            if let artist = metadata.artist { self.artist = artist }
+            if let album = metadata.album { self.album = album }
+        }
+    }
+
+    private func refreshExpectedNextTrackURI(
+        queue: [PlayerState.Track],
+        appleNext: AppleMusicManager.QueueTrack?
+    ) {
+        if let uri = queue.first?.uri, !uri.isEmpty {
+            expectedNextTrackURI = uri
+        } else if let appleNext {
+            expectedNextTrackURI = "apple:\(appleNext.id)"
+        } else {
+            expectedNextTrackURI = nil
+        }
     }
 
     private func mediaFingerprint(for payload: TrackInfo.Payload) -> String {

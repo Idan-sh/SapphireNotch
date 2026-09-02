@@ -141,36 +141,42 @@ struct LyricsView: View {
     private func trackHeaderView(elapsed: TimeInterval) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .center, spacing: 10) {
-                Group {
-                    if let artwork = musicManager.artwork {
-                        Image(nsImage: artwork)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Image(systemName: "music.note")
-                            .resizable()
-                            .scaledToFit()
-                            .padding(8)
-                            .foregroundStyle(.white.opacity(0.85))
-                            .background(.white.opacity(0.12))
+                ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                    Group {
+                        if let artwork = musicManager.artwork {
+                            Image(nsImage: artwork)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Image(systemName: "music.note")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(8)
+                                .foregroundStyle(.white.opacity(0.85))
+                                .background(.white.opacity(0.12))
+                        }
                     }
+                    .frame(width: 25, height: 26)
                 }
-                .frame(width: 25, height: 26)
 
-                VStack(alignment: .leading, spacing: 0.5) {
-                    Text(displayTitle)
-                        .font(.system(size: 9, weight: .semibold))
+                TrackMetadataTransition(
+                    identity: "lyrics-header-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+                ) {
+                    VStack(alignment: .leading, spacing: 0.5) {
+                        Text(displayTitle)
+                            .font(.system(size: 9, weight: .semibold))
 
-                    if let album = musicManager.album, !album.isEmpty {
-                        Text(album)
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                        if let album = musicManager.album, !album.isEmpty {
+                            Text(album)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
 
-                    if let artist = musicManager.artist, !artist.isEmpty {
-                        Text(artist)
-                            .font(.system(size: 8, weight: .regular))
-                            .foregroundStyle(.secondary)
+                        if let artist = musicManager.artist, !artist.isEmpty {
+                            Text(artist)
+                                .font(.system(size: 8, weight: .regular))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -335,46 +341,52 @@ private struct LyricsDetachedLeftPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
 
-            Group {
-                if let image = musicManager.artwork ?? musicManager.appIcon {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    ZStack {
-                        Color.white.opacity(0.05)
-                        Image(systemName: "music.note")
-                            .font(.system(size: 80))
-                            .foregroundStyle(.white.opacity(0.2))
+            ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                Group {
+                    if let image = musicManager.artwork ?? musicManager.appIcon {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        ZStack {
+                            Color.white.opacity(0.05)
+                            Image(systemName: "music.note")
+                                .font(.system(size: 80))
+                                .foregroundStyle(.white.opacity(0.2))
+                        }
                     }
                 }
+                .frame(width: 320, height: 320)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                )
             }
-            .frame(width: 320, height: 320)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-            )
             .scaleEffect(musicManager.isPlaying ? 1.0 : 0.95)
             .animation(.spring(response: 0.6, dampingFraction: 0.7), value: musicManager.isPlaying)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Image(systemName: "music.note.tv.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.6))
+            TrackMetadataTransition(
+                identity: "lyrics-detached-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "music.note.tv.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.6))
 
-                    Text(displayTitle)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
+                        Text(displayTitle)
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                    }
+
+                    Text(displayArtist)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
                 }
-
-                Text(displayArtist)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
             }
             .padding(.leading, 4)
         }

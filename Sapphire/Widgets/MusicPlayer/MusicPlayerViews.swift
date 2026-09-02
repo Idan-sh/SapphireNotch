@@ -383,13 +383,14 @@ struct MusicPlayerView: View {
                     }
 
                     if let cover = musicManager.artwork ?? musicManager.appIcon {
-                        Image(nsImage: cover)
-                            .resizable().aspectRatio(contentMode: .fit).frame(width: 56, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .opacity(showLiveCanvas ? 0.0 : 1.0)
-                            .compositingGroup()
-                            .shadow(color: musicManager.accentColor.opacity(0.35), radius: 6, y: 3)
-                            .id(musicManager.currentTrackArtworkToken)
+                        ArtworkCrossfade(token: musicManager.currentTrackArtworkToken) {
+                            Image(nsImage: cover)
+                                .resizable().aspectRatio(contentMode: .fit).frame(width: 56, height: 56)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .opacity(showLiveCanvas ? 0.0 : 1.0)
+                                .compositingGroup()
+                                .shadow(color: musicManager.accentColor.opacity(0.35), radius: 6, y: 3)
+                        }
                     }
 
                     Image(systemName: "heart.fill")
@@ -442,51 +443,54 @@ struct MusicPlayerView: View {
                 }
 
                 Button(action: { handleButtonTap(for: .musicQueueAndPlaylists) }) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(musicManager.title ?? "Title")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .lineLimit(1)
-                        }
-
-                        if let artist = spotifyArtist {
+                    TrackMetadataTransition(
+                        identity: "track-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
+                    ) {
+                        VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
-                                if let url = artist.avatarURL ?? artist.headerImageURL {
-                                    CachedAsyncImage(url: url) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: {
-                                        Circle().fill(Color.white.opacity(0.1))
+                                Text(musicManager.title ?? "Title")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .lineLimit(1)
+                            }
+
+                            if let artist = spotifyArtist {
+                                HStack(spacing: 6) {
+                                    if let url = artist.avatarURL ?? artist.headerImageURL {
+                                        CachedAsyncImage(url: url) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: {
+                                            Circle().fill(Color.white.opacity(0.1))
+                                        }
+                                        .frame(width: 16, height: 16)
+                                        .clipShape(Circle())
+                                        .id(artist.uri)
                                     }
-                                    .frame(width: 16, height: 16)
-                                    .clipShape(Circle())
-                                    .id(artist.uri)
+                                    Text(displayedArtistName)
+                                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                    if artist.isVerified {
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.cyan)
+                                    }
                                 }
-                                Text(displayedArtistName)
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                HStack(spacing: 8) {
+                                    if let listeners = artist.monthlyListeners ?? artist.followers {
+                                        Text("Monthly Listener: \(formattedListenerCount(listeners))")
+                                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.tertiary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            } else {
+                                Text(musicManager.artist ?? "Artist")
+                                    .font(.system(size: 12, design: .rounded))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
-                                if artist.isVerified {
-                                    Image(systemName: "checkmark.seal.fill")
-                                        .font(.system(size: 9))
-                                        .foregroundStyle(.cyan)
-                                }
                             }
-                            HStack(spacing: 8) {
-                                if let listeners = artist.monthlyListeners ?? artist.followers {
-                                    Text("Monthly Listener: \(formattedListenerCount(listeners))")
-                                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
-                                }
-                            }
-                        } else {
-                            Text(musicManager.artist ?? "Artist")
-                                .font(.system(size: 12, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
                         }
                     }
                 }
                 .buttonStyle(.sapphireInteractive())
-                .id("track-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")")
 
                 Spacer(minLength: 4)
 
@@ -1090,15 +1094,15 @@ struct MusicWidgetView: View {
                 albumArt
 
                 VStack(alignment: .leading, spacing: 8) {
-                    MusicInfoView(
-                        title: musicManager.title,
-                        album: musicManager.album,
-                        artist: musicManager.artist
-                    )
-                    .id("info-\(musicManager.title ?? "")-\(musicManager.album ?? "")-\(musicManager.artist ?? "")-\(musicManager.uri ?? "")")
-                    .animation(.easeInOut(duration: 0.2), value: musicManager.title)
-                    .animation(.easeInOut(duration: 0.2), value: musicManager.artist)
-                    .animation(.easeInOut(duration: 0.2), value: musicManager.album)
+                    TrackMetadataTransition(
+                        identity: "info-\(musicManager.title ?? "")-\(musicManager.album ?? "")-\(musicManager.artist ?? "")-\(musicManager.uri ?? "")"
+                    ) {
+                        MusicInfoView(
+                            title: musicManager.title,
+                            album: musicManager.album,
+                            artist: musicManager.artist
+                        )
+                    }
 
                     MusicControlsView(
                         isPlaying: musicManager.isPlaying,
@@ -1130,13 +1134,17 @@ struct MusicWidgetView: View {
     }
 
     private var albumArt: some View {
-        Image(nsImage: musicManager.artwork ?? musicManager.appIcon ?? NSImage(systemSymbolName: "waveform", accessibilityDescription: "Album art")!)
-            .resizable().aspectRatio(contentMode: .fill)
-            .frame(width: 100, height: 100).cornerRadius(30)
-            .shadow(color: musicManager.accentColor.opacity(0.7), radius: 8, y: 5)
-            .onHover { hovering in
-                self.isHoveringArtwork = hovering
-            }
+        ArtworkCrossfade(token: musicManager.currentTrackArtworkToken.isEmpty
+                         ? (musicManager.uri ?? musicManager.title ?? "artwork")
+                         : musicManager.currentTrackArtworkToken) {
+            Image(nsImage: musicManager.artwork ?? musicManager.appIcon ?? NSImage(systemSymbolName: "waveform", accessibilityDescription: "Album art")!)
+                .resizable().aspectRatio(contentMode: .fill)
+                .frame(width: 100, height: 100).cornerRadius(30)
+                .shadow(color: musicManager.accentColor.opacity(0.7), radius: 8, y: 5)
+        }
+        .onHover { hovering in
+            self.isHoveringArtwork = hovering
+        }
     }
 
     private func openDefaultPlayer() {
