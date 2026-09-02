@@ -1241,7 +1241,7 @@ private struct MusicControlsView: View {
                     .frame(width: buttonHitboxSize, height: buttonHitboxSize)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.sapphireInteractive())
 
             SeekButton(
                 systemName: "forward.end.fill",

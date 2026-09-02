@@ -30,6 +30,7 @@ final class LockScreenState: ObservableObject {
 }
 
 final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
+    let cursorCoordinator = NotchCursorCoordinator()
     var isFocusable: Bool = false
     var forceMouseEventPassthrough: Bool = false {
         didSet {
@@ -197,6 +198,13 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
         if ignoresMouseEvents != shouldIgnoreMouseEvents {
             ignoresMouseEvents = shouldIgnoreMouseEvents
             ignoreStateFlipCount += 1
+            if !shouldIgnoreMouseEvents, let contentView {
+                invalidateCursorRects(for: contentView)
+            }
+        }
+
+        if shouldReceiveMouseEvents {
+            cursorCoordinator.syncCursor()
         }
 
         let shouldAcceptMouseMovedEvents = shouldReceiveMouseEvents || isHandlingMouseInteraction || isFocusable
@@ -211,8 +219,11 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
         let enableFrame = effectiveInteractiveFrame.insetBy(dx: -12, dy: -12)
 
         switch event.type {
-        case .mouseMoved, .mouseEntered, .mouseExited:
+        case .mouseMoved:
             return !enableFrame.contains(event.locationInWindow)
+        case .mouseEntered, .mouseExited:
+            // Always deliver enter/exit so tracking areas can update the cursor.
+            return false
         default:
             return false
         }
@@ -366,6 +377,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         RemoteViewCrashGuardInstall()
 
         NSApp.setActivationPolicy(.accessory)
+        CursorBackgroundSupport.enableForProcess()
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -1291,6 +1303,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let container = ZStack(alignment: .top) {
             controllerView
         }
+        .interactiveCursorRoot(coordinator: window.cursorCoordinator)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
         let hosting = PassthroughHostingView(
@@ -1322,6 +1335,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
         window.contentView = hosting
         window.orderFront(nil)
+        DispatchQueue.main.async {
+            CursorBackgroundSupport.enable(for: window)
+        }
 
         notchWindows.append(window)
     }

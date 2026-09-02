@@ -167,6 +167,7 @@ struct SeekButton: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isPressing)
             .animation(.easeInOut(duration: 0.15), value: iconName)
             .animation(.easeInOut(duration: 0.12), value: didFireLongPress)
+            .interactiveCursor(.clickable)
     }
 
     private func startSeeking() {
@@ -273,7 +274,7 @@ struct InteractiveProgressBar: View {
                     }
                 }
             }
-            .background(CursorRectView(cursor: .pointingHand))
+            .interactiveCursor(.clickable)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -306,39 +307,6 @@ struct InteractiveProgressBar: View {
                     }
             )
         }
-    }
-}
-
-/// AppKit cursor rects — `NSCursor.set()` from SwiftUI hover is reset by the system.
-private struct CursorRectView: NSViewRepresentable {
-    var cursor: NSCursor
-
-    func makeNSView(context: Context) -> CursorHostingView {
-        CursorHostingView(cursor: cursor)
-    }
-
-    func updateNSView(_ nsView: CursorHostingView, context: Context) {
-        guard nsView.cursor != cursor else { return }
-        nsView.cursor = cursor
-        nsView.window?.invalidateCursorRects(for: nsView)
-    }
-
-    final class CursorHostingView: NSView {
-        var cursor: NSCursor
-
-        init(cursor: NSCursor) {
-            self.cursor = cursor
-            super.init(frame: .zero)
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-        override func resetCursorRects() {
-            addCursorRect(bounds, cursor: cursor)
-        }
-
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 

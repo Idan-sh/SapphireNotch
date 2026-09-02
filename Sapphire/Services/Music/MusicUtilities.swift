@@ -698,6 +698,7 @@ struct LongPressControlButton<Label: View>: View {
             )
         } else {
             Button(action: onTap, label: label)
+                .buttonStyle(.sapphireInteractive())
         }
     }
 }
@@ -719,6 +720,7 @@ private struct LongPressControlButtonBody<Label: View>: View {
 
     var body: some View {
         label()
+            .interactiveCursor(.clickable)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)

@@ -127,9 +127,7 @@ fileprivate struct ResizableView: View {
         }
         .frame(width: frame.width, height: frame.height)
         .position(x: frame.midX, y: frame.midY)
-        .onHover { isHovering in
-            if isHovering { NSCursor.openHand.push() } else { NSCursor.pop() }
-        }
+        .interactiveCursor(.draggable)
         .gesture(moveGesture)
     }
 
@@ -204,12 +202,11 @@ fileprivate enum ResizeHandle: String, CaseIterable, Identifiable {
         }
     }
 
-    var cursor: NSCursor {
+    var interactiveCursor: InteractiveCursor {
         switch self {
-        case .topLeft, .bottomRight: return NSCursor.crosshair
-        case .topRight, .bottomLeft: return NSCursor.crosshair
-        case .top, .bottom: return .resizeUpDown
-        case .leading, .trailing: return .resizeLeftRight
+        case .topLeft, .topRight, .bottomLeft, .bottomRight: return .resize
+        case .top, .bottom: return .resizeVertical
+        case .leading, .trailing: return .resizeHorizontal
         }
     }
 
@@ -254,9 +251,7 @@ fileprivate struct ResizeHandleView: View {
         Circle()
             .fill(Color.yellow)
             .frame(width: 12, height: 12)
-            .onHover { isHovering in
-                if isHovering { handle.cursor.push() } else { NSCursor.pop() }
-            }
+            .interactiveCursor(handle.interactiveCursor)
     }
 }
 

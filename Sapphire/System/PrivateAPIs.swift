@@ -459,3 +459,39 @@ struct CGSHelper {
         return nil
     }
 }
+
+// MARK: - Cursor in background (nonactivating panel support)
+// macOS normally refuses NSCursor updates from inactive apps. Synergy and similar
+// tools use SetsCursorInBackground on the CGS connection; notch windows also set
+// kCGSSetsCursorInBackgroundTagBit. See CGSWindow.h / Stack Overflow #3885896.
+
+@_silgen_name("CGSSetWindowTags")
+private func CGSSetWindowTags(
+    _ cid: CGSConnectionID,
+    _ wid: CGWindowID,
+    _ tags: UnsafePointer<UInt32>,
+    _ maxTagSize: Int
+) -> CGError
+
+enum CursorBackgroundSupport {
+    private static let setsCursorInBackgroundWindowTag: UInt32 = 1 << 5
+    private static let realMaximumTagSize = MemoryLayout<UInt>.size * 8
+
+    /// Allows this process to publish cursor changes while not frontmost.
+    static func enableForProcess() {
+        let connection = _CGSDefaultConnection()
+        let key = "SetsCursorInBackground" as CFString
+        _ = CGSSetConnectionProperty(connection, connection, key, kCFBooleanTrue)
+    }
+
+    static func enable(for window: NSWindow) {
+        let connection = _CGSDefaultConnection()
+        var tags: [UInt32] = [setsCursorInBackgroundWindowTag, 0]
+        _ = CGSSetWindowTags(
+            connection,
+            CGWindowID(window.windowNumber),
+            &tags,
+            realMaximumTagSize
+        )
+    }
+}
