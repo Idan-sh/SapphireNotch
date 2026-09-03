@@ -181,7 +181,7 @@ struct LyricsView: View {
                 }
             }
 
-            Text("\(formatTime(elapsed)) / \(formatTime(musicManager.totalDuration))")
+            Text("\(elapsed.asMinuteSecondClock) / \(musicManager.totalDuration.asMinuteSecondClock)")
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
 
@@ -195,13 +195,6 @@ struct LyricsView: View {
             .buttonStyle(.sapphireInteractive())
             .foregroundStyle(.secondary)
         }
-    }
-
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let clamped = max(0, seconds.isFinite ? seconds : 0)
-        let minutes = Int(clamped) / 60
-        let remainingSeconds = Int(clamped) % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
     private var displayTitle: String {
@@ -527,13 +520,13 @@ private struct LyricsDetachedBottomBar: View {
                 .frame(height: 16)
 
                 HStack {
-                    Text(formatTime(displayedElapsedTime))
+                    Text(displayedElapsedTime.asMinuteSecondClock)
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.6))
 
                     Spacer()
 
-                    Text("-" + formatTime(max(0, musicManager.totalDuration - displayedElapsedTime)))
+                    Text("-" + (max(0, musicManager.totalDuration - displayedElapsedTime)).asMinuteSecondClock)
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.6))
                 }
@@ -671,10 +664,4 @@ private struct LyricsDetachedBottomBar: View {
         }
     }
 
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let clamped = max(0, seconds.isFinite ? seconds : 0)
-        let minutes = Int(clamped) / 60
-        let remainingSeconds = Int(clamped) % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
-    }
 }

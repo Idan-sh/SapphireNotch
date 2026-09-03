@@ -115,6 +115,82 @@ class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegate {
     private let persistedAvailableUpdateKey = "SapphirePersistedAvailableUpdate"
     private let releaseSourceMigrationKey = "SapphireReleaseSource.IdanSh.SapphireNotch.v1"
 
+    private let embeddedInstallUpdateScript = """
+#!/bin/bash
+
+# Replaces the running Sapphire app bundle with a freshly downloaded one.
+# Runs as the current user when the install location is writable (no password).
+# Falls back to root only when launched with administrator privileges.
+#
+# Optional 4th argument: SYNC_MODE=1 tells the script the app is still alive and
+# waiting for this script's result, so it can detect failures and fall back. In
+# sync mode the script skips waiting for the app to quit and skips relaunching
+# it — the app relaunches itself once the script has finished.
+
+PID=$1
+NEW_APP_PATH=$2
+OLD_APP_PATH=$3
+SYNC_MODE=$4
+
+LOG_FILE="${HOME}/Library/Logs/SapphireUpdate.log"
+if [ "$(id -u)" -eq 0 ]; then
+    CONSOLE_USER=$(stat -f "%Su" /dev/console)
+    LOG_FILE=$(eval echo "~$CONSOLE_USER/Library/Logs/SapphireUpdate.log")
+fi
+
+echo "---------------------------------" >> "$LOG_FILE"
+echo "Update script started at $(date) (uid=$(id -u))" >> "$LOG_FILE"
+echo "PID to wait for: $PID" >> "$LOG_FILE"
+echo "New app path: $NEW_APP_PATH" >> "$LOG_FILE"
+echo "Old app path: $OLD_APP_PATH" >> "$LOG_FILE"
+echo "Sync mode: $SYNC_MODE" >> "$LOG_FILE"
+
+if [ -z "$OLD_APP_PATH" ] || [ "$OLD_APP_PATH" == "/" ] || [ ! -d "$OLD_APP_PATH" ]; then
+    echo "ERROR: Invalid old application path provided. Aborting update." >> "$LOG_FILE"
+    exit 1
+fi
+
+if [ "$SYNC_MODE" != "1" ]; then
+    echo "Waiting for application (PID: $PID) to quit..." >> "$LOG_FILE"
+    while ps -p "$PID" > /dev/null; do
+        sleep 1
+    done
+    echo "Application has quit." >> "$LOG_FILE"
+fi
+
+echo "Removing old application at $OLD_APP_PATH..." >> "$LOG_FILE"
+rm -rf "$OLD_APP_PATH"
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to remove old application." >> "$LOG_FILE"
+    exit 1
+fi
+echo "Old application removed." >> "$LOG_FILE"
+
+echo "Moving new application into place..." >> "$LOG_FILE"
+mv "$NEW_APP_PATH" "$OLD_APP_PATH"
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to move new application into place." >> "$LOG_FILE"
+    exit 1
+fi
+echo "New application moved." >> "$LOG_FILE"
+
+if [ "$SYNC_MODE" != "1" ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        CURRENT_USER=$(stat -f "%Su" /dev/console)
+        su - "$CURRENT_USER" -c "open \"$OLD_APP_PATH\""
+    else
+        open "$OLD_APP_PATH"
+    fi
+else
+    echo "Sync mode: relaunch is handled by the app." >> "$LOG_FILE"
+fi
+
+echo "Update script finished." >> "$LOG_FILE"
+echo "---------------------------------" >> "$LOG_FILE"
+
+exit 0
+"""
+
     private override init() {
         super.init()
         if !UserDefaults.standard.bool(forKey: releaseSourceMigrationKey) {
@@ -391,18 +467,9 @@ class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
 
     private func isInstallPathUserWritable() -> Bool {
-        let fileManager = FileManager.default
         let appURL = URL(fileURLWithPath: Bundle.main.bundlePath)
         let parentPath = appURL.deletingLastPathComponent().path
-
-        guard fileManager.isWritableFile(atPath: parentPath),
-              let attributes = try? fileManager.attributesOfItem(atPath: appURL.path),
-              let owner = attributes[.ownerAccountName] as? String,
-              owner == NSUserName() else {
-            return false
-        }
-
-        return true
+        return FileManager.default.isWritableFile(atPath: parentPath)
     }
 
     private func copyInstallerToTemporaryDirectory(scriptPath: String) throws -> String {
@@ -531,6 +598,258 @@ class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 }
             }
         }
+    }
+
+    // MARK: - Current update method (privileged helper → admin prompt → user-writable fallback)
+
+    private func prepareInstallerScript() throws -> String {
+        let tempScript = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sapphire_install_update_\(ProcessInfo.processInfo.processIdentifier).sh")
+        try? FileManager.default.removeItem(at: tempScript)
+
+        let scriptData: Data
+        if let scriptPath = Bundle.main.path(forResource: "install_update_sync", ofType: "sh"),
+           let data = try? Data(contentsOf: URL(fileURLWithPath: scriptPath)) {
+            scriptData = data
+        } else if let embedded = embeddedInstallUpdateScript.data(using: .utf8) {
+            scriptData = embedded
+        } else {
+            throw NSError(domain: "UpdateError", code: 1, userInfo: [NSLocalizedDescriptionKey: "install_update_sync.sh is unavailable."])
+        }
+
+        try scriptData.write(to: tempScript)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempScript.path)
+        return tempScript.path
+    }
+
+    nonisolated private static func runInstallerAsCurrentUser(
+        scriptPath: String,
+        processID: String,
+        newAppPath: String,
+        currentAppPath: String
+    ) throws -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [scriptPath, processID, newAppPath, currentAppPath, "1"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
+    nonisolated private static func runInstallerWithAdministratorPrivileges(
+        scriptPath: String,
+        processID: String,
+        newAppPath: String,
+        currentAppPath: String
+    ) throws -> Bool {
+        func shQuote(_ value: String) -> String {
+            "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
+        let command = "/bin/sh \(shQuote(scriptPath)) \(processID) \(shQuote(newAppPath)) \(shQuote(currentAppPath)) 1"
+        let escaped = command
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let source = "do shell script \"\(escaped)\" with administrator privileges"
+        var error: NSDictionary?
+        guard let appleScript = NSAppleScript(source: source) else {
+            throw NSError(
+                domain: "UpdateError",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Could not build the administrator prompt."]
+            )
+        }
+        if appleScript.executeAndReturnError(&error) == nil {
+            return true
+        }
+        let code = error?[NSAppleScript.errorNumber] as? Int ?? 0
+        if code == -128 {
+            throw NSError(
+                domain: "UpdateError",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "Update cancelled. Administrator access is required to replace Sapphire in this location."]
+            )
+        }
+        if code == 1 {
+            return false
+        }
+        let message = error?[NSAppleScript.errorMessage] as? String ?? "Administrator authentication failed."
+        throw NSError(domain: "UpdateError", code: 8, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    nonisolated private static func installViaPrivilegedHelper(
+        newAppPath: String,
+        currentAppPath: String
+    ) async -> Bool {
+        guard let version = await XPCClient.shared.helperProtocolVersion(timeout: 3),
+              version >= 6 else {
+            return false
+        }
+
+        return await withCheckedContinuation { continuation in
+            var resumed = false
+            func resumeOnce(_ value: Bool) {
+                guard !resumed else { return }
+                resumed = true
+                continuation.resume(returning: value)
+            }
+
+            guard let helper = XPCClient.shared.helper else {
+                resumeOnce(false)
+                return
+            }
+
+            helper.installUpdate(newAppPath: newAppPath, currentAppPath: currentAppPath) { success, _ in
+                resumeOnce(success)
+            }
+
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 15) {
+                resumeOnce(false)
+            }
+        }
+    }
+
+    enum UpdateInstallStrategy {
+        case standard
+        case withoutPassword
+    }
+
+    func installAndRelaunchCurrentMethod() {
+        installAndRelaunch(strategy: .standard)
+    }
+
+    func installAndRelaunchWithoutPassword() {
+        installAndRelaunch(strategy: .withoutPassword)
+    }
+
+    private func installAndRelaunch(strategy: UpdateInstallStrategy) {
+        guard let downloadedZipPath = downloadedAssetPath else {
+            applyStatus(.error("Downloaded file path not found.")); return
+        }
+
+        applyStatus(.installing)
+
+        Task.detached(priority: .userInitiated) {
+            do {
+
+                let fileManager = FileManager.default
+                let tempUnzipDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                try fileManager.createDirectory(at: tempUnzipDirectory, withIntermediateDirectories: true, attributes: nil)
+
+                let unzipProcess = Process()
+                unzipProcess.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+                unzipProcess.arguments = ["-o", downloadedZipPath.path, "-d", tempUnzipDirectory.path]
+                try unzipProcess.run()
+                unzipProcess.waitUntilExit()
+
+                if unzipProcess.terminationStatus != 0 {
+                    throw NSError(domain: "UpdateError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to unzip the update file."])
+                }
+
+                guard let newAppPath = try fileManager.contentsOfDirectory(atPath: tempUnzipDirectory.path).first(where: { $0.hasSuffix(".app") }) else {
+                    throw NSError(domain: "UpdateError", code: 3, userInfo: [NSLocalizedDescriptionKey: "No .app bundle found in the unzipped file."])
+                }
+                let fullNewAppPath = tempUnzipDirectory.appendingPathComponent(newAppPath).path
+
+                let currentAppPath = Bundle.main.bundlePath
+                let processID = String(ProcessInfo.processInfo.processIdentifier)
+                let userWritable = await MainActor.run { self.isInstallPathUserWritable() }
+                let tempScriptPath = try await MainActor.run {
+                    try self.prepareInstallerScript()
+                }
+
+                var installSucceeded = false
+                var installCancelled = false
+
+                switch strategy {
+                case .standard:
+                    if await Self.installViaPrivilegedHelper(newAppPath: fullNewAppPath, currentAppPath: currentAppPath) {
+                        installSucceeded = true
+                    } else {
+                        var adminError: Error?
+                        do {
+                            installSucceeded = try Self.runInstallerWithAdministratorPrivileges(
+                                scriptPath: tempScriptPath,
+                                processID: processID,
+                                newAppPath: fullNewAppPath,
+                                currentAppPath: currentAppPath
+                            )
+                        } catch {
+                            if Self.isInstallCancellation(error) {
+                                installCancelled = true
+                            } else {
+                                adminError = error
+                            }
+                        }
+
+                        if !installSucceeded, !installCancelled, userWritable {
+                            let exitCode = (try? Self.runInstallerAsCurrentUser(
+                                scriptPath: tempScriptPath,
+                                processID: processID,
+                                newAppPath: fullNewAppPath,
+                                currentAppPath: currentAppPath
+                            )) ?? -1
+                            installSucceeded = exitCode == 0
+                        }
+
+                        if !installSucceeded, !installCancelled, let adminError {
+                            throw adminError
+                        }
+                    }
+
+                case .withoutPassword:
+                    guard userWritable else {
+                        throw NSError(
+                            domain: "UpdateError",
+                            code: 9,
+                            userInfo: [NSLocalizedDescriptionKey: "Sapphire isn't in a user-writable location, so the no-password update method can't replace it. Use the standard install method instead."]
+                        )
+                    }
+                    let exitCode = try Self.runInstallerAsCurrentUser(
+                        scriptPath: tempScriptPath,
+                        processID: processID,
+                        newAppPath: fullNewAppPath,
+                        currentAppPath: currentAppPath
+                    )
+                    installSucceeded = exitCode == 0
+                }
+
+                if installSucceeded {
+                    Self.scheduleRelaunch(of: currentAppPath)
+                    await MainActor.run {
+                        NSApp.terminate(nil)
+                    }
+                } else if installCancelled {
+                    await MainActor.run {
+                        self.applyStatus(.downloaded(path: downloadedZipPath))
+                    }
+                } else {
+                    await MainActor.run {
+                        self.applyStatus(.error("The installer script failed to replace Sapphire. The update was not installed."))
+                    }
+                }
+
+            } catch {
+                await MainActor.run {
+                    self.applyStatus(.error(error.localizedDescription))
+                }
+            }
+        }
+    }
+
+    nonisolated private static func isInstallCancellation(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == "UpdateError" && nsError.code == 7
+    }
+
+    nonisolated private static func scheduleRelaunch(of appPath: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "sleep 3; open \"$1\"", "sapphire-relaunch", appPath]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

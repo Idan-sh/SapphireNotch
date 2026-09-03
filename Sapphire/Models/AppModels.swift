@@ -27,6 +27,7 @@ enum NotchWidgetMode: Hashable {
     case calendarPlayer
     case sportsPlayer
     case financePlayer
+    case shopifyOrders
     case notesPlayer
     case clipboardPlayer
     case mirrorPlayer
@@ -51,6 +52,8 @@ enum NotchWidgetMode: Hashable {
     case geminiApiKeysMissing
     case musicLoginPrompt
     case timerDetailView
+    case focusSessionDetailView
+    case batteryDetailView
     case agentS
     case blipHub
     case circleToSearch
@@ -73,6 +76,8 @@ enum NotchWidgetMode: Hashable {
             hasher.combine(23)
         case .financePlayer:
             hasher.combine(24)
+        case .shopifyOrders:
+            hasher.combine(33)
         case .notesPlayer:
             hasher.combine(25)
         case .clipboardPlayer:
@@ -120,6 +125,10 @@ enum NotchWidgetMode: Hashable {
             hasher.combine(19)
         case .timerDetailView:
             hasher.combine(20)
+        case .focusSessionDetailView:
+            hasher.combine(32)
+        case .batteryDetailView:
+            hasher.combine(34)
         case .multiAudioAppEQ:
             hasher.combine(21)
         case .agentS:
@@ -157,6 +166,21 @@ enum LiveActivityContent: Equatable {
     case full(view: AnyView, id: AnyHashable, bottomCornerRadius: CGFloat? = nil)
     case standard(data: StandardActivityData, id: AnyHashable)
 
+    var renderIdentity: AnyHashable? {
+        switch self {
+        case .none: return nil
+        case .full(_, let id, _), .standard(_, let id): return id
+        }
+    }
+
+    var layoutKind: LiveActivityLayoutKind {
+        switch self {
+        case .none: return .none
+        case .full: return .full
+        case .standard: return .standard
+        }
+    }
+
     static func == (lhs: LiveActivityContent, rhs: LiveActivityContent) -> Bool {
         switch (lhs, rhs) {
         case (.none, .none):
@@ -171,10 +195,17 @@ enum LiveActivityContent: Equatable {
     }
 }
 
+enum LiveActivityLayoutKind: Equatable {
+    case none
+    case standard
+    case full
+}
+
 enum MusicBottomContentType: Equatable {
     case none
     case peek(title: String, artist: String?)
     case lyrics(text: String, id: UUID)
+    case upNext(title: String, artist: String?, artworkURL: URL?)
 }
 
 enum SportsBottomContentType: Equatable {
@@ -230,6 +261,7 @@ enum StandardActivityData: Equatable {
     case calendar(event: EKEvent)
     case battery(state: BatteryState, style: BatteryNotificationStyle, timeRemaining: String?, systemState: BatterySystemState)
     case timer
+    case focusSession
     case desktop(number: Int)
     case focus(mode: FocusModeInfo)
     case fileShelf(count: Int)
@@ -255,6 +287,7 @@ enum StandardActivityData: Equatable {
         case let (.calendar(a), .calendar(b)): return a == b
         case let (.reminder(a), .reminder(b)): return a == b
         case (.timer, .timer): return true
+        case (.focusSession, .focusSession): return true
         case let (.battery(s1, st1, t1, sy1), .battery(s2, st2, t2, sy2)):
                     return s1 == s2 && st1 == st2 && t1 == t2 && sy1 == sy2
         case let (.desktop(a), .desktop(b)): return a == b
@@ -291,6 +324,12 @@ struct NearDropPayload: Identifiable, Hashable {
 enum GeminiLiveState: Equatable, Hashable { case active }
 struct GeminiPayload: Identifiable, Hashable {
     let id = UUID(); var state: GeminiLiveState = .active; var isMicMuted: Bool = true
+}
+
+struct RestrictedAppPayload: Identifiable, Hashable {
+    let id = UUID()
+    let appName: String
+    let bundleID: String
 }
 
 struct MicrophonePayload: Identifiable, Equatable, Hashable {

@@ -63,8 +63,6 @@ struct NotchWidgetView: View {
     @EnvironmentObject private var calendarService: CalendarService
     @EnvironmentObject var intelligenceVM: IntelligenceNotchViewModel
 
-    @Environment(\.notchCornerRadius) private var cornerRadius
-
     @StateObject private var dragState = DragStateManager.shared
 
     private var currentMode: NotchWidgetMode {
@@ -82,7 +80,7 @@ struct NotchWidgetView: View {
     }
 
     private var menuWidgetOrder: [WidgetType] {
-        settings.settings.widgetOrder.filter { $0 != .agent }
+        settings.settings.widgetOrder
     }
 
     private var enabledAndOrderedWidgets: [WidgetType] {
@@ -98,8 +96,12 @@ struct NotchWidgetView: View {
                 return settings.settings.sportsWidgetEnabled && SubscriptionManager.shared.hasAccess(to: .sportsWidget)
             case .finance:
                 return settings.settings.financeWidgetEnabled && SubscriptionManager.shared.hasAccess(to: .financeWidget)
+            case .shopify:
+                return settings.settings.shopifyWidgetEnabled
             case .calendar:
                 return settings.settings.calendarWidgetEnabled
+            case .battery:
+                return settings.settings.batteryWidgetEnabled
             case .shortcuts:
                 return settings.settings.shortcutsWidgetEnabled
             case .notes:
@@ -110,6 +112,8 @@ struct NotchWidgetView: View {
                 return settings.settings.mirrorWidgetEnabled
             case .agent:
                 return false
+            case .focusSession:
+                return settings.settings.focusSessionWidgetEnabled
             }
         }
 
@@ -175,7 +179,7 @@ struct NotchWidgetView: View {
                 self.blurRadius = 0
             }
         }
-        .notchHorizontalPadding(cornerRadius: cornerRadius)
+        .notchHorizontalPadding()
     }
 
     @ViewBuilder
@@ -204,6 +208,8 @@ struct NotchWidgetView: View {
             SportsPlayerView(navigationStack: navigationStack)
         case .financePlayer:
             FinancePlayerView(navigationStack: navigationStack)
+        case .shopifyOrders:
+            ShopifyOrdersView()
         case .notesPlayer:
             NotesPlayerView(navigationStack: navigationStack)
         case .clipboardPlayer:
@@ -272,6 +278,10 @@ struct NotchWidgetView: View {
             CircleToSearchResultsView(navigationStack: navigationStack)
         case .updateAvailable:
             UpdateAvailableWidgetView()
+        case .focusSessionDetailView:
+            FocusSessionDetailView(navigationStack: navigationStack)
+        case .batteryDetailView:
+            BatteryDetailView()
         }
     }
 
@@ -318,6 +328,8 @@ struct NotchWidgetView: View {
                         }
                     }
                 }
+        case .shopify:
+            ShopifyOrdersWidgetView()
         case .calendar:
             CalendarWidgetView(viewModel: calendarViewModel)
                 .onTapGesture {
@@ -355,6 +367,10 @@ struct NotchWidgetView: View {
                 }
         case .mirror:
             MirrorWidgetView()
+        case .focusSession:
+            FocusWidgetView()
+        case .battery:
+            BatteryWidgetView()
         case .agent:
             EmptyView()
         }

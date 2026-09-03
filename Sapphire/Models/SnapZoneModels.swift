@@ -51,6 +51,20 @@ struct SnapLayout: Codable, Equatable, Identifiable, Hashable {
     }
 }
 
+struct SnapZoneShortcut: Codable, Equatable, Identifiable, Hashable {
+    var id: UUID
+    var layoutID: UUID
+    var zoneID: UUID
+    var shortcut: KeyboardShortcut
+
+    init(id: UUID = UUID(), layoutID: UUID, zoneID: UUID, shortcut: KeyboardShortcut) {
+        self.id = id
+        self.layoutID = layoutID
+        self.zoneID = zoneID
+        self.shortcut = shortcut
+    }
+}
+
 struct KeyboardShortcut: Codable, Equatable, Hashable {
     var key: String
     var modifiers: NSEvent.ModifierFlags

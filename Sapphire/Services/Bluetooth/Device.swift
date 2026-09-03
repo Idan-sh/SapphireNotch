@@ -98,7 +98,7 @@ protocol BLEDelegate {
 
 // MARK: - BLE Class (with Probing Logic)
 class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
-    var centralMgr : CBCentralManager!
+    lazy var centralMgr: CBCentralManager = CBCentralManager(delegate: self, queue: nil)
     var devices : [UUID : Device] = [:]
     var delegate: BLEDelegate?
     var monitoredUUID: UUID?
@@ -124,11 +124,6 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     var isScanningContinuously = false
     var includeUnnamedDevices = false
     private var peripheralsBeingProbed = Set<UUID>()
-
-    override init() {
-        super.init()
-        centralMgr = CBCentralManager(delegate: self, queue: nil)
-    }
 
     // MARK: - Scanning Control
 

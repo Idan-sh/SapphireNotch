@@ -1,3 +1,9 @@
+//
+//  MonitoringCore.swift
+//  Sapphire
+//
+//  Created by Shariq Charolia on 2026-08-30
+
 #if !SAPPHIRE_FULL_BUILD
 import Foundation
 
@@ -8,6 +14,10 @@ enum MonitorType: String, Codable, CaseIterable, Identifiable {
     case spotify
     case screenshots
     case system
+    case screen
+    case audio
+    case location
+    case contacts
 
     var id: String { rawValue }
 
@@ -19,6 +29,10 @@ enum MonitorType: String, Codable, CaseIterable, Identifiable {
         case .spotify: "Spotify"
         case .screenshots: "Screenshots"
         case .system: "System"
+        case .screen: "Screen"
+        case .audio: "Audio"
+        case .location: "Location"
+        case .contacts: "Contacts"
         }
     }
 
@@ -30,6 +44,10 @@ enum MonitorType: String, Codable, CaseIterable, Identifiable {
         case .spotify: "music.note"
         case .screenshots: "camera.viewfinder"
         case .system: "gearshape"
+        case .screen: "rectangle.dashed"
+        case .audio: "waveform"
+        case .location: "location"
+        case .contacts: "person.crop.circle"
         }
     }
 }

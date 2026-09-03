@@ -19,10 +19,13 @@ enum WidgetLayoutPolicy {
         case .shortcuts: return 110
         case .sports: return 190
         case .finance: return 190
+        case .shopify: return 190
         case .notes: return 176
         case .clipboard: return 176
         case .mirror: return 140
+        case .battery: return 210
         case .agent: return 0
+        case .focusSession: return 190
         }
     }
 

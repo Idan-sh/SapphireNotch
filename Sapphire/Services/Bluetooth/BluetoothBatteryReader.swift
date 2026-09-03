@@ -20,57 +20,62 @@ class BluetoothBatteryReader: NSObject, ObservableObject {
     private var centralManager: CBCentralManager!
     private var pendingPeripherals: Set<CBPeripheral> = []
     private var pendingContinuation: CheckedContinuation<Void, Never>?
+    private var batchTimeoutTask: Task<Void, Never>?
     private var readResults: [String: Int] = [:]
     private var logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Sapphire", category: "BluetoothBatteryReader")
 
     private override init() {
         super.init()
-        centralManager = CBCentralManager(delegate: nil, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: false])
+    }
+
+    private func ensureCentralManager() -> CBCentralManager {
+        if let centralManager { return centralManager }
+        let manager = CBCentralManager(delegate: nil, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: false])
+        centralManager = manager
+        return manager
     }
 
     func refreshAllBatteries() async {
         readResults.removeAll()
         pendingPeripherals.removeAll()
+        batchTimeoutTask?.cancel()
 
-        readBatteriesFromPlist()
+        let readings = await Task.detached(priority: .utility) {
+            Self.parseBluetoothPlistReadings()
+        }.value
+        applyPlistReadings(readings)
+
         await readBatteriesFromCoreBluetooth()
 
         logger.debug("BluetoothBatteryReader completed with \(self.readResults.count) results")
     }
 
-    private func readBatteriesFromPlist() {
-        guard let plist = NSDictionary(contentsOfFile: "/Library/Preferences/com.apple.Bluetooth.plist") else { return }
+    private struct PlistBatteryReading: Sendable {
+        let deviceID: String
+        let deviceName: String
+        let batteryLevel: Int
+        let requiresStaleCheck: Bool
+    }
+
+    private nonisolated static func parseBluetoothPlistReadings() -> [PlistBatteryReading] {
+        var readings: [PlistBatteryReading] = []
+
+        guard let plist = NSDictionary(contentsOfFile: "/Library/Preferences/com.apple.Bluetooth.plist") else { return readings }
 
         if let cbcache = plist["CoreBluetoothCache"] as? [String: [String: Any]] {
             for (uuid, info) in cbcache {
                 if let batteryLevel = info["BatteryLevel"] as? Int, batteryLevel > 0, batteryLevel <= 100 {
                     let deviceName = (info["DeviceName"] as? String) ?? uuid
                     let address = info["DeviceAddress"] as? String ?? uuid
-                    let now = Date().timeIntervalSince1970
-
-                    if AirBatteryModel.checkIfBlocked(name: deviceName) { continue }
-
-                    let device = BatteryDevice(
-                        deviceID: address,
-                        deviceType: "general_bt",
-                        deviceName: deviceName,
-                        batteryLevel: batteryLevel,
-                        isCharging: 0,
-                        lastUpdate: now
-                    )
-                    AirBatteryModel.updateDevice(device)
-                    readResults[address] = batteryLevel
-                    logger.debug("[Plist] \(deviceName): \(batteryLevel)%")
+                    readings.append(PlistBatteryReading(deviceID: address, deviceName: deviceName, batteryLevel: batteryLevel, requiresStaleCheck: false))
                 }
             }
         }
 
         if let devCache = plist["DeviceCache"] as? [String: [String: Any]] {
-            let now = Date().timeIntervalSince1970
             for (mac, info) in devCache {
                 guard let deviceName = info["Name"] as? String,
-                      !deviceName.isEmpty,
-                      !AirBatteryModel.checkIfBlocked(name: deviceName) else { continue }
+                      !deviceName.isEmpty else { continue }
 
                 let batteryLevels: [(String, String?)] = [
                     ("BatteryPercent", nil),
@@ -82,51 +87,90 @@ class BluetoothBatteryReader: NSObject, ObservableObject {
 
                 for (key, side) in batteryLevels {
                     guard let raw = info[key] as? Int, raw > 0, raw <= 100 else { continue }
-                    let suffix: String
-                    if let s = side { suffix = " (\(s))" } else { suffix = "" }
-
-                    let existing = AirBatteryModel.getByName(deviceName + suffix)
-                    if existing == nil || (now - (existing?.lastUpdate ?? 0)) > 120 {
-                        let device = BatteryDevice(
-                            deviceID: mac + suffix,
-                            deviceType: "general_bt",
-                            deviceName: deviceName + suffix,
-                            batteryLevel: raw,
-                            isCharging: 0,
-                            lastUpdate: now
-                        )
-                        AirBatteryModel.updateDevice(device)
-                        readResults[mac + suffix] = raw
-                        logger.debug("[Plist/DeviceCache] \(deviceName)\(suffix): \(raw)%")
-                    }
+                    let suffix = side.map { " (\($0))" } ?? ""
+                    readings.append(PlistBatteryReading(deviceID: mac + suffix, deviceName: deviceName + suffix, batteryLevel: raw, requiresStaleCheck: true))
                 }
             }
+        }
+
+        return readings
+    }
+
+    private func applyPlistReadings(_ readings: [PlistBatteryReading]) {
+        let now = Date().timeIntervalSince1970
+
+        for reading in readings {
+            if AirBatteryModel.checkIfBlocked(name: reading.deviceName) { continue }
+
+            let existing = AirBatteryModel.getByName(reading.deviceName)
+            if reading.requiresStaleCheck, let existing, (now - existing.lastUpdate) <= 120 { continue }
+
+            let device = BatteryDevice(
+                deviceID: reading.deviceID,
+                deviceType: "general_bt",
+                deviceName: reading.deviceName,
+                batteryLevel: reading.batteryLevel,
+                isCharging: 0,
+                lastUpdate: now
+            )
+            AirBatteryModel.updateDevice(device)
+            readResults[reading.deviceID] = reading.batteryLevel
+            let source = reading.requiresStaleCheck ? "Plist/DeviceCache" : "Plist"
+            logger.debug("[\(source, privacy: .public)] \(reading.deviceName, privacy: .public): \(reading.batteryLevel)%")
         }
     }
 
     private func readBatteriesFromCoreBluetooth() async {
-        guard centralManager.state == .poweredOn else {
+        guard CBManager.authorization == .allowedAlways else {
+            logger.debug("Bluetooth access not granted; skipping CoreBluetooth battery reads")
+            return
+        }
+
+        let central = ensureCentralManager()
+        guard central.state == .poweredOn else {
             logger.debug("CoreBluetooth not powered on, skipping")
             return
         }
 
-        let connected = centralManager.retrieveConnectedPeripherals(withServices: [batteryServiceUUID])
+        let connected = central.retrieveConnectedPeripherals(withServices: [batteryServiceUUID])
         guard !connected.isEmpty else {
             logger.debug("No connected peripherals with Battery Service")
             return
         }
 
         logger.debug("Found \(connected.count) connected peripherals with Battery Service")
-        centralManager.delegate = self
+        central.delegate = self
 
         for peripheral in connected {
             pendingPeripherals.insert(peripheral)
-            centralManager.connect(peripheral, options: nil)
+            central.connect(peripheral, options: nil)
         }
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             pendingContinuation = continuation
+            batchTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 12_000_000_000)
+                self?.releaseBatch(afterTimeout: true)
+            }
         }
+    }
+
+    private func releaseBatch(afterTimeout: Bool) {
+        guard let continuation = pendingContinuation else { return }
+        pendingContinuation = nil
+        batchTimeoutTask?.cancel()
+        batchTimeoutTask = nil
+
+        if afterTimeout {
+            for peripheral in pendingPeripherals {
+                centralManager.cancelPeripheralConnection(peripheral)
+            }
+            pendingPeripherals.removeAll()
+            centralManager.delegate = nil
+            logger.debug("CoreBluetooth battery batch timed out; released")
+        }
+
+        continuation.resume()
     }
 }
 
@@ -146,7 +190,7 @@ extension BluetoothBatteryReader: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         pendingPeripherals.remove(peripheral)
-        if pendingPeripherals.isEmpty { pendingContinuation?.resume(); pendingContinuation = nil }
+        if pendingPeripherals.isEmpty { releaseBatch(afterTimeout: false) }
     }
 }
 
@@ -155,7 +199,7 @@ extension BluetoothBatteryReader: CBPeripheralDelegate {
         guard let services = peripheral.services else {
             centralManager.cancelPeripheralConnection(peripheral)
             pendingPeripherals.remove(peripheral)
-            if pendingPeripherals.isEmpty { pendingContinuation?.resume(); pendingContinuation = nil }
+            if pendingPeripherals.isEmpty { releaseBatch(afterTimeout: false) }
             return
         }
         for service in services {
@@ -217,22 +261,29 @@ extension BluetoothBatteryReader: CBPeripheralDelegate {
         centralManager.cancelPeripheralConnection(peripheral)
         pendingPeripherals.remove(peripheral)
         if pendingPeripherals.isEmpty {
-            pendingContinuation?.resume()
-            pendingContinuation = nil
+            releaseBatch(afterTimeout: false)
         }
     }
 }
 
 extension BluetoothBatteryReader {
-    static func getSystemProfileBatteries() -> [(name: String, level: Int, type: String)] {
+
+    nonisolated static func getSystemProfileBatteries() async -> [(name: String, level: Int, type: String)] {
+        guard let result = await ProcessRunner.run(
+            executablePath: "/usr/sbin/system_profiler",
+            arguments: ["SPBluetoothDataType", "-json"],
+            timeout: 15
+        ), result.succeeded else {
+            return []
+        }
+
+        return parseSystemProfilerData(result.stdoutData)
+    }
+
+    private nonisolated static func parseSystemProfilerData(_ data: Data) -> [(name: String, level: Int, type: String)] {
         var results: [(String, Int, String)] = []
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        task.arguments = ["SPBluetoothDataType", "-json"]
-
-        guard let data = try? task.runSyncReturningData(),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let btData = json["SPBluetoothDataType"] as? [[String: Any]],
               let first = btData.first,
               let devices = first["device_connected"] as? [[String: Any]] else {
@@ -258,15 +309,5 @@ extension BluetoothBatteryReader {
             }
         }
         return results
-    }
-}
-
-extension Process {
-    func runSyncReturningData() throws -> Data {
-        let pipe = Pipe()
-        standardOutput = pipe
-        try run()
-        waitUntilExit()
-        return pipe.fileHandleForReading.readDataToEndOfFile()
     }
 }

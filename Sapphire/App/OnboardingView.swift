@@ -87,6 +87,7 @@ struct OnboardingView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -367,6 +368,12 @@ private struct MusicChoiceStepView: View {
                 MusicServiceButton(title: "Spotify", icon: "spotify_logo", isSelected: selection == .spotify) {
                     selection = .spotify
                 }
+                MusicServiceButton(title: "Tidal", icon: "sf:waveform", isSelected: selection == .tidal) {
+                    selection = .tidal
+                }
+                MusicServiceButton(title: "YouTube Music", icon: "sf:play.rectangle.fill", isSelected: selection == .youtubeMusic) {
+                    selection = .youtubeMusic
+                }
             }
             .padding(50)
 
@@ -558,9 +565,6 @@ private struct SubscriptionOverviewStepView: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     var onNext: () -> Void
 
-    @State private var showUpgradeSheet = false
-    @State private var selectedCheckoutTier: SubscriptionTier = .basic
-
     private var currentTier: SubscriptionTier {
         subscriptionManager.activeTier
     }
@@ -652,25 +656,20 @@ private struct SubscriptionOverviewStepView: View {
             OnboardingButton(title: "Skip", action: onNext)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sheet(isPresented: $showUpgradeSheet, onDismiss: {
-            Task { await subscriptionManager.bootstrap() }
-        }) {
-            NativePaymentSheetView(tier: selectedCheckoutTier, deviceCount: 1, isAddingOnly: false) {
-                showUpgradeSheet = false
-            }
-            .frame(
-                width: min(820, (NSScreen.main?.visibleFrame.width ?? 820) * 0.80),
-                height: min(750, (NSScreen.main?.visibleFrame.height ?? 750) * 0.75)
-            )
-        }
         .onAppear {
             Task { await subscriptionManager.bootstrap() }
         }
     }
 
     private func beginCheckout(for tier: SubscriptionTier) {
-        selectedCheckoutTier = tier
-        showUpgradeSheet = true
+        let plan = tier == .free ? "basic" : tier.rawValue
+        guard var components = URLComponents(string: "https://sapphire-app.tech/checkout.html") else { return }
+        components.queryItems = [
+            URLQueryItem(name: "plan", value: plan),
+            URLQueryItem(name: "qty", value: "1")
+        ]
+        guard let url = components.url else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func onboardingTierRank(_ tier: SubscriptionTier) -> Int {
@@ -933,7 +932,15 @@ private struct MusicServiceButton: View {
     let title: String, icon: String, isSelected: Bool
     let action: () -> Void
     @State private var isPressed = false
-    @ViewBuilder private var iconView: some View { if icon == "music.note" { Image(systemName: icon).resizable().renderingMode(.template).foregroundColor(.white) } else { Image(icon).resizable().renderingMode(.original) } }
+    @ViewBuilder private var iconView: some View {
+        if icon.hasPrefix("sf:") {
+            Image(systemName: String(icon.dropFirst(3))).resizable().renderingMode(.template).foregroundColor(.white)
+        } else if icon == "music.note" {
+            Image(systemName: icon).resizable().renderingMode(.template).foregroundColor(.white)
+        } else {
+            Image(icon).resizable().renderingMode(.original)
+        }
+    }
     var body: some View {
         HStack {
             iconView.aspectRatio(contentMode: .fit).frame(width: 28, height: 28)
@@ -960,6 +967,8 @@ private struct PermissionRowView: View {
             Image(systemName: permission.iconName).font(.title2).frame(width: 40, height: 40).background(permission.iconColor.opacity(0.2)).clipShape(Circle()).foregroundColor(permission.iconColor)
             VStack(alignment: .leading, spacing: 2) { Text(permission.title).font(.headline); Text(permission.description).font(.subheadline).foregroundColor(.secondary) }
             Spacer()
+            PermissionFeatureInfoButton(permission: permission)
+                .padding(.trailing, 4)
             let status = manager.status(for: permission.type)
             switch status {
             case .granted: Image(systemName: "checkmark.circle.fill").font(.title2).foregroundColor(.green)
