@@ -115,12 +115,18 @@ final class FocusWebsiteBlocker {
 private final class FocusBlockPageServer {
     var productiveAccessHandler: ((String) -> Bool)?
     private var listener: NWListener?
-    private let queue = DispatchQueue(label: "com.cshariq.sapphire.focus-block-redirect")
+    private let queue = DispatchQueue(label: "com.idansh.sapphire.focus-block-redirect")
 
     func start() {
         guard listener == nil else { return }
+        // /etc/hosts maps blocked domains to 127.0.0.1, so HTTP clients hit :80.
+        // Binding :80 requires privilege; when it fails the hosts block still
+        // blackholes traffic but the sapphire-app.tech redirect page will not show.
         guard let port = NWEndpoint.Port(rawValue: 80),
-              let newListener = try? NWListener(using: .tcp, on: port) else { return }
+              let newListener = try? NWListener(using: .tcp, on: port) else {
+            print("[FocusWebsiteBlocker] Could not bind redirect server on :80 (needs privilege). Hosts blocking still applies.")
+            return
+        }
         listener = newListener
         newListener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection)

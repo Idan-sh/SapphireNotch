@@ -13,9 +13,10 @@ final class MenuBarInteractionManager {
     static let shared = MenuBarInteractionManager()
 
     // MARK: - Monitors
+    private var pollingTimer: Timer?
     private var clickToken: UUID?
-    private var hoverProbe: MenuBarHoverProbe?
-    private var hoverRevealTimer: Timer?
+    private var scrollMonitor: Any?
+    private var hoverTriggerTimer: Timer?
 
     // MARK: - State
     public var isMonitoring = false
@@ -41,34 +42,90 @@ final class MenuBarInteractionManager {
     func setSuspended(_ suspended: Bool) {
         guard isSuspended != suspended else { return }
         isSuspended = suspended
-        if suspended { cancelHoverReveal() }
+        if suspended {
+            hoverTriggerTimer?.invalidate()
+            hoverTriggerTimer = nil
+        }
     }
 
     func stopMonitoring() {
         guard isMonitoring else { return }
         isMonitoring = false
         isSuspended = false
-        stopClickMonitoring()
         stopHoverMonitoring()
+        stopClickMonitoring()
+        stopScrollMonitoring()
         cancellables.removeAll()
     }
 
     private func updateMonitors(for settings: Settings) {
+        if settings.showOnHover && pollingTimer == nil {
+            startHoverMonitoring()
+        } else if !settings.showOnHover && pollingTimer != nil {
+            stopHoverMonitoring()
+        }
+
         if settings.showOnClick && clickToken == nil {
             startClickMonitoring()
         } else if !settings.showOnClick && clickToken != nil {
             stopClickMonitoring()
         }
 
-        if settings.showOnHover && hoverProbe == nil {
-            startHoverMonitoring()
-        } else if !settings.showOnHover && hoverProbe != nil {
-            stopHoverMonitoring()
+        if settings.showOnScroll && scrollMonitor == nil {
+            startScrollMonitoring()
+        } else if !settings.showOnScroll && scrollMonitor != nil {
+            stopScrollMonitoring()
         }
     }
 
     func temporarilyDisable(for duration: TimeInterval) {
         disabledUntil = Date().addingTimeInterval(duration)
+    }
+
+    // MARK: - Hover Monitoring (poll mouse location — event probes on
+    // ignoresMouseEvents windows do not reliably deliver enter/exit)
+
+    private func startHoverMonitoring() {
+        guard pollingTimer == nil else { return }
+
+        let interval: TimeInterval = 0.05
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkMousePosition() }
+        }
+        timer.tolerance = interval * 0.4
+        RunLoop.main.add(timer, forMode: .common)
+        pollingTimer = timer
+    }
+
+    private func stopHoverMonitoring() {
+        pollingTimer?.invalidate()
+        pollingTimer = nil
+        hoverTriggerTimer?.invalidate()
+        hoverTriggerTimer = nil
+    }
+
+    private func checkMousePosition() {
+        guard isMonitoring, !isSuspended else { return }
+        guard Date() >= (disabledUntil ?? .distantPast) else { return }
+
+        let location = NSEvent.mouseLocation
+        let isNearTop = NSScreen.screens.contains { screen in
+            location.y >= (screen.frame.maxY - 30)
+        }
+
+        if isNearTop && isLocationInMenuBar(location) {
+            if hoverTriggerTimer == nil {
+                let delay = max(0, SettingsModel.shared.settings.showOnHoverDelay)
+                let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.showHiddenItems() }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                hoverTriggerTimer = timer
+            }
+        } else {
+            hoverTriggerTimer?.invalidate()
+            hoverTriggerTimer = nil
+        }
     }
 
     // MARK: - Click Monitoring
@@ -81,11 +138,8 @@ final class MenuBarInteractionManager {
             guard Date() >= (self.disabledUntil ?? .distantPast) else { return }
 
             let location = NSEvent.mouseLocation
-
-            if self.isLocationInMenuBar(location) {
-                if self.isClickInEmptyMenuBarArea(location) {
-                    self.showHiddenItems()
-                }
+            if self.isLocationInMenuBar(location), self.isClickInEmptyMenuBarArea(location) {
+                self.showHiddenItems()
             }
         }
     }
@@ -97,57 +151,31 @@ final class MenuBarInteractionManager {
         }
     }
 
-    // MARK: - Hover Monitoring
+    // MARK: - Scroll Monitoring
 
-    private func startHoverMonitoring() {
-        guard hoverProbe == nil else { return }
-        let probe = MenuBarHoverProbe()
-        hoverProbe = probe
-        probe.start { [weak self] isInside in
-            self?.handleMenuBarHoverChange(isInside)
+    private func startScrollMonitoring() {
+        guard scrollMonitor == nil else { return }
+
+        scrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self else { return }
+            Task { @MainActor in
+                guard self.isMonitoring, !self.isSuspended else { return }
+                guard Date() >= (self.disabledUntil ?? .distantPast) else { return }
+                guard abs(event.scrollingDeltaY) > 2 || abs(event.scrollingDeltaX) > 2 else { return }
+
+                let location = NSEvent.mouseLocation
+                if self.isLocationInMenuBar(location) {
+                    self.showHiddenItems()
+                }
+            }
         }
     }
 
-    private func stopHoverMonitoring() {
-        hoverProbe?.stop()
-        hoverProbe = nil
-        cancelHoverReveal()
-    }
-
-    private func handleMenuBarHoverChange(_ isInside: Bool) {
-        guard isMonitoring, !isSuspended else { return }
-        if isInside {
-            scheduleHoverReveal()
-        } else {
-            cancelHoverReveal()
+    private func stopScrollMonitoring() {
+        if let monitor = scrollMonitor {
+            NSEvent.removeMonitor(monitor)
+            scrollMonitor = nil
         }
-    }
-
-    private func scheduleHoverReveal() {
-        cancelHoverReveal()
-        guard Date() >= (disabledUntil ?? .distantPast) else { return }
-
-        let delay = max(0, SettingsModel.shared.settings.showOnHoverDelay)
-        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.fireHoverReveal() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        hoverRevealTimer = timer
-    }
-
-    private func cancelHoverReveal() {
-        hoverRevealTimer?.invalidate()
-        hoverRevealTimer = nil
-    }
-
-    private func fireHoverReveal() {
-        hoverRevealTimer = nil
-
-        guard isMonitoring, !isSuspended, hoverProbe?.isHovering == true else { return }
-        guard Date() >= (disabledUntil ?? .distantPast) else { return }
-        guard isLocationInMenuBar(NSEvent.mouseLocation) else { return }
-
-        showHiddenItems()
     }
 
     // MARK: - Helpers
@@ -157,9 +185,12 @@ final class MenuBarInteractionManager {
 
         let menuBarHeight = s.frame.height - s.visibleFrame.height
         let actualHeight = menuBarHeight > 0 ? menuBarHeight : 24.0
-
-        let menuBarRect = CGRect(x: s.frame.origin.x, y: s.frame.maxY - actualHeight, width: s.frame.width, height: actualHeight)
-
+        let menuBarRect = CGRect(
+            x: s.frame.origin.x,
+            y: s.frame.maxY - actualHeight,
+            width: s.frame.width,
+            height: actualHeight
+        )
         return menuBarRect.contains(loc)
     }
 

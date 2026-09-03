@@ -79,10 +79,9 @@ struct NotchController: View {
     @State private var hudOverlayOpacity: Double = 0.0
     @State private var hudOverlayBlur: CGFloat = 10.0
 
-    @State private var hoverMonitor: NotchHoverMonitor?
+    @State private var notchInteractionPollingTimer: Timer?
     @State private var lastSampledMouseLocation: CGPoint?
     @State private var lastPublishedInteractiveFrame: CGRect = .null
-    @State private var appliedMouseState: AppliedMouseState?
     @State private var lastActivityShapeSignature: NotchShapeSignature = .none
     @State private var isCalendarHovered: Bool = false
     @State private var fileDropFlowObserver: NSObjectProtocol?
@@ -1726,23 +1725,26 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
 
     // MARK: - Helper Methods
     private func startNotchInteractionMonitoring() {
-        guard let window = notchWindow else { return }
+        guard notchInteractionPollingTimer == nil else { return }
 
-        let monitor = hoverMonitor ?? NotchHoverMonitor()
-        hoverMonitor = monitor
-        monitor.start(window: window) {
-            refreshNotchInteractionState()
+        // Poll continuously: event-based hover probes on an ignoresMouseEvents
+        // window do not reliably deliver enter/exit, which left the notch
+        // click-through and broke interactive cursors after the upstream merge.
+        let interval = 1.0 / 20.0
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in
+            self.refreshNotchInteractionState()
         }
-        appliedMouseState = nil
+        timer.tolerance = 0.02
+        notchInteractionPollingTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
         refreshNotchInteractionState()
     }
 
     private func stopNotchInteractionMonitoring() {
-        hoverMonitor?.stop()
-        hoverMonitor = nil
+        notchInteractionPollingTimer?.invalidate()
+        notchInteractionPollingTimer = nil
         lastSampledMouseLocation = nil
         lastPublishedInteractiveFrame = .null
-        appliedMouseState = nil
     }
 
     private func refreshNotchInteractionState() {
@@ -1757,9 +1759,11 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         let mouseLocation = window.mouseLocationOutsideOfEventStream
         let interactiveBounds = interactiveFrame(for: window, config: config)
         let isNear = isMouseNearNotchFrame(interactiveBounds, mouseLocation: mouseLocation)
+        let isExpanded = notchState != .initial
+        let hoverMargin = (isHovered && isExpanded) ? Self.hoverCollapseMargin : Self.hoverDetectionMargin
         let detectionBounds = interactiveBounds.insetBy(
-            dx: -Self.hoverDetectionMargin,
-            dy: -Self.hoverDetectionMargin
+            dx: -hoverMargin,
+            dy: -hoverMargin
         )
         let isPointerInside = detectionBounds.contains(mouseLocation)
 
@@ -1928,65 +1932,30 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         }
     }
 
-    private struct AppliedMouseState: Equatable {
-        var hidden: Bool
-        var interactiveFrame: CGRect
-        var interactive: Bool
-        var forcePassthrough: Bool
-        var hoverRect: CGRect
-        var pointerIsInside: Bool
-    }
-
     private func updateMouseEventHandling(isInteractive: Bool) {
         guard let window = notchWindow, let config = config else { return }
 
-        let desired: AppliedMouseState
         if isManuallyHidden {
-            desired = AppliedMouseState(
-                hidden: true,
-                interactiveFrame: .zero,
-                interactive: false,
-                forcePassthrough: true,
-                hoverRect: .null,
-                pointerIsInside: false
-            )
-        } else {
-            let frame = interactiveFrame(for: window, config: config)
-            desired = AppliedMouseState(
-                hidden: false,
-                interactiveFrame: frame,
-                interactive: isInteractive,
-                forcePassthrough: false,
-                hoverRect: frame.insetBy(dx: -Self.hoverDetectionMargin, dy: -Self.hoverDetectionMargin),
-                pointerIsInside: isHovered
-            )
-        }
-
-        guard desired != appliedMouseState else { return }
-        appliedMouseState = desired
-
-        if desired.hidden {
             window.ignoresMouseEvents = true
             if let dynamicWindow = window as? DynamicFocusWindow {
                 dynamicWindow.forceMouseEventPassthrough = true
                 dynamicWindow.updateInteractiveContentFrame(.zero)
             }
-            hoverMonitor?.update(hoverRect: .null, pointerIsInside: false)
             return
         }
 
         if let dynamicWindow = window as? DynamicFocusWindow {
             dynamicWindow.forceMouseEventPassthrough = false
-            dynamicWindow.updateInteractiveContentFrame(desired.interactiveFrame)
-            dynamicWindow.syncMouseEventPassthrough(forceEnable: desired.interactive && notchState == .clickExpanded)
+            dynamicWindow.updateInteractiveContentFrame(interactiveFrame(for: dynamicWindow, config: config))
+            // Keep syncing on each poll so ignoresMouseEvents tracks the pointer
+            // inside the interactive frame (required for clicks + cursor).
+            dynamicWindow.syncMouseEventPassthrough(forceEnable: isInteractive && notchState == .clickExpanded)
         } else if window.contentView != nil {
-            let shouldIgnore = !desired.interactive
+            let shouldIgnore = !isInteractive
             if window.ignoresMouseEvents != shouldIgnore {
                 window.ignoresMouseEvents = shouldIgnore
             }
         }
-
-        hoverMonitor?.update(hoverRect: desired.hoverRect, pointerIsInside: desired.pointerIsInside)
     }
 
     private func updateWindowSharingBehavior(shouldBeHidden: Bool) {

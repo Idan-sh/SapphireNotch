@@ -70,7 +70,6 @@ enum MusicKitTokenStore {
 
     // MARK: - User token
 
-    private static let userTokenKeychainService = "com.cshariq.sapphire"
     private static let userTokenKeychainAccount = "musicKitUserToken"
 
     static var storedUserToken: String? {

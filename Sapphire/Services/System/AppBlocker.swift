@@ -73,12 +73,6 @@ final class AppBlocker {
             self.activationObserver = nil
         }
     }
-
-    deinit {
-        if let activationObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
-        }
-    }
 }
 
 enum AppShieldMode {
