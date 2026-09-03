@@ -1446,6 +1446,14 @@ struct WaveformView: View {
             case .skippedBackward: return "backward.end.fill"
             }
         }
+
+        /// Play/pause feedback icons invert the hover control; drop them on unhover.
+        var shouldClearOnHoverExit: Bool {
+            switch self {
+            case .paused, .played: return true
+            case .skippedForward, .skippedBackward: return false
+            }
+        }
     }
 
     private var barCount: Int {
@@ -1499,7 +1507,10 @@ struct WaveformView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
         .animation(.default, value: musicManager.transientIcon)
         .onHover { hovering in
-            self.isHovering = hovering
+            if !hovering, musicManager.transientIcon?.shouldClearOnHoverExit == true {
+                musicManager.transientIcon = nil
+            }
+            isHovering = hovering
         }
         .onAppear(perform: setupInitialState)
         .onReceive(musicManager.volumePublisher.receive(on: RunLoop.main)) { newVolume in
