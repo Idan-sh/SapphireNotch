@@ -1369,7 +1369,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         window.hasShadow = false
         window.displayID = displayID(for: screen) ?? 0
         window.level = .statusBar
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         window.ignoresMouseEvents = true
         window.sharingType = settingsModel.settings.hideFromScreenSharing ? .none : .readOnly
 
