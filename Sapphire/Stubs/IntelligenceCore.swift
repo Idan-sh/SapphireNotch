@@ -262,11 +262,4 @@ struct IntelligenceSettingsView: View {
     }
 }
 
-final class EncryptionManager {
-    static let shared = EncryptionManager()
-    private init() {}
-
-    func encrypt(_ data: Data) throws -> Data { data }
-    func decrypt(_ data: Data) throws -> Data { data }
-}
 #endif

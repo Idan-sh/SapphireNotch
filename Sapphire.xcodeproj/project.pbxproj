@@ -1440,6 +1440,8 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = YES;
 				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = "/Users/shariq/Github/Sapphire/Sapphire/Stubs/*";
+				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = "/Users/shariq/Github/Sapphire/Sapphire/Stubs/*";
 				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Sapphire/Services/Music";
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/PrivateHeaders";
@@ -1448,6 +1450,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Blip needs access to analyze Notes and Spotify activity to learn your preferences.";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Used to show upcming songs and playlists within apple music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Sapphire needs bluetooth to show new connections and battery low notifications";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Sapphire needs calendar permission to show upcoming events";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Blip can learn from your calendar patterns to better understand your schedule and preferences.";
@@ -1484,10 +1487,10 @@
 					"$(PROJECT_DIR)/Sapphire/Services/Music",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.72;
+				MARKETING_VERSION = 2.8;
 				OTHER_CODE_SIGN_FLAGS = "";
 				OTHER_LDFLAGS = "";
-				OTHER_SWIFT_FLAGS = "";
+				OTHER_SWIFT_FLAGS = "-DSAPPHIRE_IS_BETA_BUILD";
 				PRODUCT_BUNDLE_IDENTIFIER = com.idansh.sapphire;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1528,6 +1531,8 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = YES;
 				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = "/Users/shariq/Github/Sapphire/Sapphire/Stubs/*";
+				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = "/Users/shariq/Github/Sapphire/Sapphire/Stubs/*";
 				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Sapphire/Services/Music";
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/PrivateHeaders";
@@ -1536,6 +1541,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Blip needs access to analyze Notes and Spotify activity to learn your preferences.";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Used to show upcming songs and playlists within apple music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Sapphire needs bluetooth to show new connections and battery low notifications";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Sapphire needs calendar permission to show upcoming events";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Blip can learn from your calendar patterns to better understand your schedule and preferences.";
@@ -1572,10 +1578,10 @@
 					"$(PROJECT_DIR)/Sapphire/Services/Music",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.72;
+				MARKETING_VERSION = 2.8;
 				OTHER_CODE_SIGN_FLAGS = "";
 				OTHER_LDFLAGS = "";
-				OTHER_SWIFT_FLAGS = "";
+				OTHER_SWIFT_FLAGS = "-DSAPPHIRE_IS_BETA_BUILD";
 				PRODUCT_BUNDLE_IDENTIFIER = com.idansh.sapphire;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

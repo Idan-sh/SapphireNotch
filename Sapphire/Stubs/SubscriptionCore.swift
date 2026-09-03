@@ -1,3 +1,9 @@
+//
+//  SubscriptionCore.swift
+//  Sapphire
+//
+//  Created by Shariq Charolia on 2026-08-30
+
 #if !SAPPHIRE_FULL_BUILD
 import Foundation
 import Combine
@@ -10,7 +16,8 @@ public enum SubscriptionTier: String, Codable, CaseIterable {
 public enum AppFeature: String, Codable, CaseIterable {
     case unlimitedLyricsFetch, translation, geminiLive, advancedFileConversion,
          priorityAutomation, betaSoftwareUpdates, circleToSearch, liveSports,
-         financeWidget, sportsWidget, financeLiveActivity, prioritizedFeedback
+         financeWidget, sportsWidget, financeLiveActivity, prioritizedFeedback,
+         focusProductiveAccess, focusSessions, appLock
 }
 
 public struct SubscriptionEntitlements: Codable, Equatable {

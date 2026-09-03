@@ -10,35 +10,78 @@ import Combine
 import Carbon.HIToolbox
 
 private func executionTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
-    guard let refcon = refcon else { return Unmanaged.passRetained(event) }
-
-    let manager = Unmanaged<KeyboardShortcutManager>.fromOpaque(refcon).takeUnretainedValue()
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        Task { @MainActor in
-            manager.ensureEventTapEnabled(forceRebuild: true)
+        guard AccessibilityTrustMonitor.isCurrentlyTrusted() else {
+            if let refcon = refcon {
+                let manager = Unmanaged<KeyboardShortcutManager>.fromOpaque(refcon).takeUnretainedValue()
+                Task { @MainActor in
+                    manager.stopMonitoring()
+                }
+            }
+            return Unmanaged.passRetained(event)
+        }
+        if let refcon = refcon {
+            let manager = Unmanaged<KeyboardShortcutManager>.fromOpaque(refcon).takeUnretainedValue()
+            Task { @MainActor in
+                manager.ensureEventTapEnabled(forceRebuild: true)
+            }
         }
         return Unmanaged.passRetained(event)
     }
+
+    guard AccessibilityTrustMonitor.isCurrentlyTrusted() else {
+        return Unmanaged.passRetained(event)
+    }
+
+    guard let refcon = refcon else { return Unmanaged.passRetained(event) }
+    let manager = Unmanaged<KeyboardShortcutManager>.fromOpaque(refcon).takeUnretainedValue()
     return manager.handle(event: event, type: type)
 }
 
 class KeyboardShortcutManager {
     static let shared = KeyboardShortcutManager()
 
+    private enum ShortcutAction {
+        case plane(Plane)
+        case snapZone(SnapZoneShortcut)
+    }
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
+    private var notificationObservers: [NSObjectProtocol] = []
 
-    private var registeredShortcuts: [KeyboardShortcut: Plane] = [:]
+    private var registeredShortcuts: [KeyboardShortcut: ShortcutAction] = [:]
     private let cacheLock = NSLock()
+    private let triggerLock = NSLock()
     private var lastTriggerAt = Date.distantPast
 
     private var isAccessibilitySuspended = false
+    private var isShortcutRecording = false
 
     private init() {
         registerTrustAwareness()
+
+        notificationObservers = [
+            NotificationCenter.default.addObserver(
+                forName: .sapphireShortcutRecordingDidStart,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isShortcutRecording = true
+                self?.stopMonitoring()
+            },
+            NotificationCenter.default.addObserver(
+                forName: .sapphireShortcutRecordingDidEnd,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isShortcutRecording = false
+                self?.setupMonitor()
+            }
+        ]
 
         SettingsModel.shared.$settings
             .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
@@ -46,6 +89,10 @@ class KeyboardShortcutManager {
                 self?.setupMonitor()
             }
             .store(in: &cancellables)
+    }
+
+    deinit {
+        notificationObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
     private func registerTrustAwareness() {
@@ -59,25 +106,26 @@ class KeyboardShortcutManager {
     }
 
     func setupMonitor() {
-        guard !isAccessibilitySuspended else { return }
+        guard !isAccessibilitySuspended, !isShortcutRecording else { return }
         stopMonitoring()
 
         let planesWithShortcuts = SettingsModel.shared.settings.planes.filter { $0.shortcut != nil }
-        for plane in planesWithShortcuts {
-            if let shortcut = plane.shortcut {
-            }
-        }
+        let snapZoneShortcuts = SettingsModel.shared.settings.snapZoneShortcuts
 
         cacheLock.withLock {
             registeredShortcuts.removeAll()
+
             for plane in planesWithShortcuts {
                 if let shortcut = plane.shortcut {
-                    registeredShortcuts[shortcut] = plane
+                    registeredShortcuts[shortcut] = .plane(plane)
                 }
+            }
+            for mapping in snapZoneShortcuts {
+                registeredShortcuts[mapping.shortcut] = .snapZone(mapping)
             }
         }
 
-        if planesWithShortcuts.isEmpty {
+        if planesWithShortcuts.isEmpty && snapZoneShortcuts.isEmpty {
             return
         }
 
@@ -101,7 +149,9 @@ class KeyboardShortcutManager {
             CGEvent.tapEnable(tap: eventTap, enable: true)
         }
 
-        installFallbackMonitors()
+        if eventTap == nil {
+            installFallbackMonitors()
+        }
     }
 
     private func installFallbackMonitors() {
@@ -113,7 +163,6 @@ class KeyboardShortcutManager {
 
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            print("[KeyboardShortcutManager] [LOCAL MONITOR] keyDown keyCode=\(event.keyCode) chars=\(event.charactersIgnoringModifiers ?? "nil") flags=0x\(String(event.modifierFlags.rawValue, radix: 16))")
             return self.handleNSEvent(event, swallow: true) ? nil : event
         }
     }
@@ -156,6 +205,9 @@ class KeyboardShortcutManager {
 
     nonisolated func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
         guard type == .keyDown else { return Unmanaged.passRetained(event) }
+        guard event.getIntegerValueField(.eventSourceUserData) != SapphireSyntheticEventMarker.plainTextPaste else {
+            return Unmanaged.passRetained(event)
+        }
 
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
 
@@ -171,26 +223,19 @@ class KeyboardShortcutManager {
 
         let currentShortcut = KeyboardShortcut(key: keyString, modifiers: flags)
 
-        var planeToActivate: Plane?
-        cacheLock.withLock {
-            planeToActivate = registeredShortcuts[currentShortcut]
-        }
+        guard let action = action(for: currentShortcut) else { return Unmanaged.passRetained(event) }
+        guard shouldTrigger() else { return nil }
 
-        guard let plane = planeToActivate else { return Unmanaged.passRetained(event) }
-
-        let now = Date()
-        guard now.timeIntervalSince(lastTriggerAt) > 0.3 else { return nil }
-        lastTriggerAt = now
-
-        Task { @MainActor in
-            WindowArrangementManager.shared.activate(plane: plane)
-        }
+        perform(action)
         return nil
     }
 
     @discardableResult
     private func handleNSEvent(_ event: NSEvent, swallow: Bool) -> Bool {
         guard event.type == .keyDown, !event.isARepeat else { return false }
+        guard event.cgEvent?.getIntegerValueField(.eventSourceUserData) != SapphireSyntheticEventMarker.plainTextPaste else {
+            return false
+        }
 
         let keyCode = UInt16(event.keyCode)
         guard let keyString = KeyCodeTranslator.shared.string(for: keyCode, from: event) else {
@@ -200,20 +245,36 @@ class KeyboardShortcutManager {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let currentShortcut = KeyboardShortcut(key: keyString, modifiers: modifiers)
 
-        var planeToActivate: Plane?
-        cacheLock.withLock {
-            planeToActivate = registeredShortcuts[currentShortcut]
-        }
+        guard let action = action(for: currentShortcut) else { return false }
+        guard shouldTrigger() else { return swallow }
 
-        guard let plane = planeToActivate else { return false }
-
-        let now = Date()
-        guard now.timeIntervalSince(lastTriggerAt) > 0.3 else { return swallow }
-        lastTriggerAt = now
-
-        Task { @MainActor in
-            WindowArrangementManager.shared.activate(plane: plane)
-        }
+        perform(action)
         return swallow
+    }
+
+    private func action(for shortcut: KeyboardShortcut) -> ShortcutAction? {
+        cacheLock.withLock {
+            registeredShortcuts[shortcut]
+        }
+    }
+
+    private func shouldTrigger() -> Bool {
+        triggerLock.withLock {
+            let now = Date()
+            guard now.timeIntervalSince(lastTriggerAt) > 0.3 else { return false }
+            lastTriggerAt = now
+            return true
+        }
+    }
+
+    private func perform(_ action: ShortcutAction) {
+        Task { @MainActor in
+            switch action {
+            case .plane(let plane):
+                WindowArrangementManager.shared.activate(plane: plane)
+            case .snapZone(let mapping):
+                SnappingManager.snap(layoutID: mapping.layoutID, zoneID: mapping.zoneID)
+            }
+        }
     }
 }

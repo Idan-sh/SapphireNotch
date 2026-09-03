@@ -31,6 +31,7 @@ final class LockScreenState: ObservableObject {
 
 final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
     let cursorCoordinator = NotchCursorCoordinator()
+    var displayID: CGDirectDisplayID = 0
     var isFocusable: Bool = false
     var forceMouseEventPassthrough: Bool = false {
         didSet {
@@ -39,19 +40,14 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
         }
     }
     private var interactiveContentFrame: CGRect = .zero
-    private var diagnosticsTimer: Timer?
     private var isHandlingMouseInteraction = false
-    private var lastPolledMousePoint: CGPoint?
     private var passthroughRefreshPending = false
     private var pendingForceEnable = false
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Sapphire", category: "NotchDiagnostics")
-    private var passthroughRefreshCount = 0
-    private var sendEventCount = 0
-    private var mouseMovedEventCount = 0
-    private var outsideInteractivePollCount = 0
-    private var ignoreStateFlipCount = 0
-    private var hitTestRejectCount = 0
-    private var droppedMoveEventCount = 0
+    private var pendingMousePoint: NSPoint?
+    private var lastAppliedMousePoint: NSPoint?
+    private var lastAppliedInteractiveFrame: CGRect = .null
+    private var lastAppliedForcePassthrough = false
+    private var lastAppliedFocusable = false
 
     override var canBecomeKey: Bool { isFocusable }
     override var canBecomeMain: Bool { isFocusable }
@@ -86,10 +82,6 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
-        diagnosticsTimer?.invalidate()
-    }
-
     func updateInteractiveContentFrame(_ frame: CGRect) {
         let previousFrame = interactiveContentFrame
 
@@ -107,39 +99,22 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
         interactiveContentFrame.contains(point)
     }
 
-    func recordHitTestRejection(at point: CGPoint) {
-        guard contentView?.bounds.contains(point) == true else { return }
-        hitTestRejectCount += 1
-    }
-
     override func sendEvent(_ event: NSEvent) {
-        sendEventCount += 1
-
-        if shouldDropPassivePointerEvent(event) {
-            droppedMoveEventCount += 1
-            scheduleMouseEventPassthroughRefresh()
-            return
-        }
-
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             isHandlingMouseInteraction = true
         case .leftMouseUp, .rightMouseUp, .otherMouseUp:
             isHandlingMouseInteraction = false
-        case .mouseMoved:
-            mouseMovedEventCount += 1
         default:
             break
         }
 
-        switch event.type {
-        case .leftMouseDown, .leftMouseUp, .leftMouseDragged,
-                .rightMouseDown, .rightMouseUp, .rightMouseDragged,
-                .otherMouseDown, .otherMouseUp, .otherMouseDragged,
-                .mouseMoved, .mouseEntered, .mouseExited:
-            scheduleMouseEventPassthroughRefresh()
-        default:
-            break
+        if event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown {
+            scheduleMouseEventPassthroughRefresh(forceEnable: true)
+        }
+
+        if shouldDropPassivePointerEvent(event) {
+            return
         }
 
         super.sendEvent(event)
@@ -153,70 +128,72 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
     }
 
     private func scheduleMouseEventPassthroughRefresh(forceEnable: Bool = false) {
-        pendingForceEnable = forceEnable
+        pendingForceEnable = pendingForceEnable || forceEnable
         guard !passthroughRefreshPending else { return }
         passthroughRefreshPending = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.passthroughRefreshPending = false
-            self.refreshMouseEventPassthrough(force: true, forceEnable: self.pendingForceEnable)
+            let forceEnable = self.pendingForceEnable
+            self.pendingForceEnable = false
+            self.refreshMouseEventPassthrough(forceEnable: forceEnable)
         }
     }
 
-    private func refreshMouseEventPassthrough(force: Bool = false, forceEnable: Bool = false) {
+    private func refreshMouseEventPassthrough(forceEnable: Bool = false) {
         guard contentView != nil else { return }
 
-        if forceMouseEventPassthrough {
-            if !ignoresMouseEvents {
-                ignoresMouseEvents = true
-                ignoreStateFlipCount += 1
-            }
-            return
-        }
-
-        guard force || isHandlingMouseInteraction || isVisible else {
-            return
-        }
         let mousePoint = mouseLocationOutsideOfEventStream
-        if !force, !isHandlingMouseInteraction, lastPolledMousePoint == mousePoint {
+        if forceMouseEventPassthrough {
+            guard !lastAppliedForcePassthrough || !ignoresMouseEvents else { return }
+            lastAppliedForcePassthrough = true
+            lastAppliedMousePoint = mousePoint
+            if !ignoresMouseEvents { ignoresMouseEvents = true }
             return
         }
 
-        lastPolledMousePoint = mousePoint
+        guard isHandlingMouseInteraction || isVisible || forceEnable else { return }
+        let frameChanged = interactiveContentFrame != lastAppliedInteractiveFrame
+        let pointChanged = mousePoint != lastAppliedMousePoint
+        let stateChanged = isFocusable != lastAppliedFocusable
+        guard forceEnable || frameChanged || pointChanged || stateChanged || lastAppliedForcePassthrough else { return }
 
-        let effectiveInteractiveFrame = interactiveContentFrame.isEmpty ? (contentView?.bounds ?? .zero) : interactiveContentFrame
-        let enableFrame = effectiveInteractiveFrame.insetBy(dx: -12, dy: -12)
+        let desiredReceive = desiredReceiveState(at: mousePoint, forceEnable: forceEnable)
+        let shouldIgnoreMouseEvents = !desiredReceive
+        let shouldAcceptMouseMovedEvents = desiredReceive || isHandlingMouseInteraction || isFocusable
 
-        let shouldReceiveMouseEvents: Bool
-        if isHandlingMouseInteraction || (forceEnable && enableFrame.contains(mousePoint)) {
-            shouldReceiveMouseEvents = true
-        } else {
-            shouldReceiveMouseEvents = enableFrame.contains(mousePoint)
-        }
-
-        let shouldIgnoreMouseEvents = !shouldReceiveMouseEvents
         if ignoresMouseEvents != shouldIgnoreMouseEvents {
             ignoresMouseEvents = shouldIgnoreMouseEvents
-            ignoreStateFlipCount += 1
             if !shouldIgnoreMouseEvents, let contentView {
                 invalidateCursorRects(for: contentView)
             }
         }
+        if acceptsMouseMovedEvents != shouldAcceptMouseMovedEvents { acceptsMouseMovedEvents = shouldAcceptMouseMovedEvents }
 
-        if shouldReceiveMouseEvents {
+        if desiredReceive {
             cursorCoordinator.syncCursor()
         }
 
-        let shouldAcceptMouseMovedEvents = shouldReceiveMouseEvents || isHandlingMouseInteraction || isFocusable
-        if acceptsMouseMovedEvents != shouldAcceptMouseMovedEvents {
-            acceptsMouseMovedEvents = shouldAcceptMouseMovedEvents
-        }
+        lastAppliedForcePassthrough = false
+        lastAppliedMousePoint = mousePoint
+        lastAppliedInteractiveFrame = interactiveContentFrame
+        lastAppliedFocusable = isFocusable
+    }
+
+    private func desiredReceiveState(at point: NSPoint, forceEnable: Bool = false) -> Bool {
+        if isHandlingMouseInteraction { return true }
+        guard !interactiveContentFrame.isEmpty else { return false }
+        let enableFrame = interactiveContentFrame.insetBy(dx: -12, dy: -12)
+        if forceEnable && enableFrame.contains(point) { return true }
+        return enableFrame.contains(point)
     }
 
     private func shouldDropPassivePointerEvent(_ event: NSEvent) -> Bool {
         guard !isHandlingMouseInteraction else { return false }
-        let effectiveInteractiveFrame = interactiveContentFrame.isEmpty ? (contentView?.bounds ?? .zero) : interactiveContentFrame
-        let enableFrame = effectiveInteractiveFrame.insetBy(dx: -12, dy: -12)
+        guard !interactiveContentFrame.isEmpty else {
+            return true
+        }
+        let enableFrame = interactiveContentFrame.insetBy(dx: -12, dy: -12)
 
         switch event.type {
         case .mouseMoved:
@@ -228,6 +205,7 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
             return false
         }
     }
+
 }
 
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
@@ -246,10 +224,9 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
             return super.hitTest(point)
         }
 
-        guard window.containsInteractivePoint(point) else {
-            window.recordHitTestRejection(at: point)
-            return nil
-        }
+        if window.forceMouseEventPassthrough { return nil }
+
+        if !window.containsInteractivePoint(point) { return nil }
 
         return super.hitTest(point)
     }
@@ -268,15 +245,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private var isMainAppRunning = false
     private var subscriptionObservation: AnyCancellable?
     private var subscriptionValidationTimer: Timer?
+    private var backgroundInitializationTask: Task<Void, Never>?
+    private var sessionObserversInstalled = false
+    private var networkPathSatisfied = false
 
     private lazy var lockScreenManager = LockScreenManager.shared
     private lazy var lidAngleAutomationManager = LidAngleAutomationManager.shared
 
     lazy var musicManager: MusicManager = .shared
     lazy var systemHUDManager: SystemHUDManager = .shared
+    lazy var pillHUDController: PillHUDController = .shared
     lazy var notificationManager: NotificationManager = NotificationManager()
     lazy var desktopManager: DesktopManager = DesktopManager()
-    lazy var focusModeManager: FocusModeManager = FocusModeManager()
+    lazy var focusModeManager: FocusModeManager = .shared
     lazy var calendarService: CalendarService = CalendarService()
     lazy var batteryMonitor: BatteryMonitor = .shared
     lazy var batteryManager = BatteryManager.shared
@@ -286,6 +267,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     lazy var multiAudioManager: MultiAudioManager = .shared
     lazy var eyeBreakManager: EyeBreakManager = EyeBreakManager()
     lazy var timerManager: TimerManager = TimerManager()
+    lazy var focusSessionManager: FocusSessionManager = .shared
+    lazy var focusSessionShortcutMonitor: FocusSessionShortcutMonitor = .shared
+    lazy var focusScheduleManager: FocusScheduleManager = .shared
+    lazy var appLockManager: AppLockManager = .shared
     lazy var weatherActivityViewModel: WeatherActivityViewModel = WeatherActivityViewModel()
     lazy var contentPickerHelper: ContentPickerHelper = ContentPickerHelper()
     lazy var geminiLiveManager: GeminiLiveManager = GeminiLiveManager()
@@ -353,18 +338,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     // MARK: - Lifecycle
 
-    private func setupMemoryPressureHandler() {
-        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical])
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            let event = source.data
-            Task { @MainActor in
-                MemoryTrimSupport.trimUnderMemoryPressure(musicManager: self.musicManager)
-            }
-        }
-        source.resume()
-    }
-
     func unregisterHelper() {
         do {
             try SMAppService.mainApp.unregister()
@@ -391,6 +364,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             object: nil
         )
         SapphireAnalytics.bootstrap()
+        SapphireBrowserIntegration.shared.start()
 
         if settingsModel.settings.sportsWidgetEnabled {
             SportsAPIService.shared.bootstrapIfNeeded()
@@ -402,8 +376,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             ProcessCPUMonitor.shared.startPeriodicReporting(interval: 60)
             print("[PerfMon] CPU performance monitor enabled. Report logs every 60s.")
         }
-
-        setupMemoryPressureHandler()
 
         Task {
             await SubscriptionManager.shared.bootstrap()
@@ -440,6 +412,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             .map(\.neardropDeviceDisplayName)
             .removeDuplicates()
             .sink { NearbyConnectionManager.shared.deviceDisplayName = $0 }
+            .store(in: &cancellables)
+
+        settingsModel.$settings
+            .map(\.neardropEnabled)
+            .removeDuplicates()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                if enabled {
+                    self.startNearbyShareIfNeeded()
+                } else {
+                    NearbyConnectionManager.shared.becomeInvisible()
+                }
+            }
             .store(in: &cancellables)
 
         settingsModel.$settings
@@ -487,7 +472,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         settingsModel.$settings
             .map(\.notchDisplayTarget)
             .removeDuplicates()
-            .sink { [weak self] _ in self?.createNotchWindow() }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                DispatchQueue.main.async { [weak self] in
+                    self?.createNotchWindow()
+                }
+            }
             .store(in: &cancellables)
 
         observeSubscriptionForBetaGate()
@@ -535,6 +526,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         guard isMainAppRunning else { return }
 
         AppSystemTeardown.restoreManagedSystemState(reason: "beta-access-revoked")
+        NearbyConnectionManager.shared.becomeInvisible()
 
         isMainAppRunning = false
 
@@ -567,6 +559,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         subscriptionValidationTimer?.invalidate()
         subscriptionValidationTimer = nil
+        LockScreenWallpaperManager.shared.restore()
 
         NotificationCenter.default.removeObserver(
             self,
@@ -687,6 +680,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         createNotchWindow()
         _ = circleToSearchManager
         _ = keyboardShortcutManager
+        _ = focusSessionShortcutMonitor
+        _ = focusScheduleManager
+        _ = appLockManager
         _ = lidAngleAutomationManager
         setupStatusBarItem()
         initializeBackgroundServices()
@@ -708,6 +704,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         NotificationCenter.default.addObserver(self, selector: #selector(handleAccountPaneOpened), name: .sapphireOpenAccountPane, object: nil)
         UNUserNotificationCenter.current().delegate = self
         NearbyConnectionManager.shared.mainAppDelegate = self
+        startNearbyShareIfNeeded()
         UpdateChecker.shared.startPeriodicChecks(interval: 5 * 60 * 60)
         if settingsModel.settings.launchpadEnabled {
             setupLaunchpad()
@@ -744,22 +741,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         _ = batteryManager
     }
 
+    private func startNearbyShareIfNeeded() {
+        guard isMainAppRunning, settingsModel.settings.neardropEnabled else { return }
+        NearbyConnectionManager.shared.becomeVisible()
+    }
+
     private func initializeBackgroundServices() {
-        DispatchQueue.global(qos: .utility).async {
-            self.initializeCoreManagers()
-            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2.0) {
+        guard backgroundInitializationTask == nil else { return }
+        backgroundInitializationTask = Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await MainActor.run { self.initializeCoreManagers() }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
                 _ = IOBluetoothDevice.pairedDevices()
-                if self.settingsModel.settings.neardropEnabled {
-                    NearbyConnectionManager.shared.becomeVisible()
-                }
-                Task { _ = await self.batteryManager.getBatteryTemperature() }
             }
+            _ = await self.batteryManager.getBatteryTemperature()
         }
     }
 
     // MARK: - Session Observers
 
     private func setupSessionObservers() {
+        guard !sessionObserversInstalled else { return }
+        sessionObserversInstalled = true
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(self, selector: #selector(screenIsLocked), name: .init("com.apple.screenIsLocked"), object: nil)
         dnc.addObserver(self, selector: #selector(screenIsUnlocked), name: .init("com.apple.screenIsUnlocked"), object: nil)
@@ -800,22 +805,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         networkMonitor = NWPathMonitor()
         networkMonitor?.pathUpdateHandler = { [weak self] path in
-            guard path.status == .satisfied else { return }
+            guard let self else { return }
             DispatchQueue.main.async {
-                print("[AppDelegate] Network connection re-established.")
-                self?.musicManager.spotifyPrivateAPI.checkAndReconnectIfNeeded()
+                let isSatisfied = path.status == .satisfied
+                guard isSatisfied, !self.networkPathSatisfied else { return }
+                self.networkPathSatisfied = true
+                print("[AppDelegate] Network connection became available.")
+                self.musicManager.spotifyPrivateAPI.checkAndReconnectIfNeeded()
                 Task {
                     await SubscriptionManager.shared.validateSubscriptionStatus()
                 }
             }
         }
-        networkMonitor?.start(queue: DispatchQueue(label: "NetworkMonitor"))
+        networkMonitor?.start(queue: DispatchQueue(label: "NetworkMonitor", qos: .utility))
     }
 
     private var hasPresentedHelperConnectionAlertThisSession = false
     private var helperHasConnectedThisSession = false
 
     @objc private func systemDidWake(notification: NSNotification) {
+        scheduleNotchDisplayRefresh()
         batteryManager.reconnectHelper()
         HelperManager.shared.checkIfRunning(force: true)
 
@@ -839,7 +848,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     @objc private func displayDidWake(notification: NSNotification) {
         AuthenticationManager.shared.handleDisplayDidWake()
+        scheduleNotchDisplayRefresh()
         onDisplayWake()
+    }
+
+    private func scheduleNotchDisplayRefresh() {
+        guard isMainAppRunning else { return }
+        notchScreenRefreshRetryWorkItem?.cancel()
+        notchScreenRefreshGeneration += 1
+        let generation = notchScreenRefreshGeneration
+        refreshNotchScreens(generation: generation, attempt: 0)
     }
 
     @objc private func handleApplicationDidBecomeActive(_ notification: Notification) {
@@ -944,6 +962,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         guard let mainScreen = NSScreen.main else { return }
         var widgetConfigs: [LockScreenManager.LockScreenWidgetConfig] = []
 
+        if settingsModel.settings.lockScreenCustomWallpaperEnabled {
+            LockScreenWallpaperManager.shared.applyCustomWallpaperIfEnabled(
+                path: settingsModel.settings.lockScreenCustomWallpaperPath
+            )
+        }
+
         if settingsModel.settings.lockScreenShowInfoWidget {
             widgetConfigs.append(.init(
                 id: "infoWidget",
@@ -1045,7 +1069,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     @objc private func screenIsUnlocked() {
-        lockScreenManager.hideAndDestroyWindows()
+        LockScreenWallpaperManager.shared.restore()
 
         LockScreenMusicPaneController.shared.reset()
 
@@ -1101,6 +1125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     func applicationWillTerminate(_ aNotification: Notification) {
         settingsModel.flushPendingSave()
+        NearbyConnectionManager.shared.becomeInvisible()
         BatteryManager.shared.stopSleepBatteryLogging()
         cleanupNotchWindow()
 
@@ -1118,7 +1143,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         )
         cgsSpace = nil
         NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        backgroundInitializationTask?.cancel()
+        backgroundInitializationTask = nil
         networkMonitor?.cancel()
+        networkMonitor = nil
+        sessionObserversInstalled = false
         UpdateChecker.shared.stopPeriodicChecks()
         teardownLaunchpad()
         interactionManager?.stopMonitoring()
@@ -1128,6 +1157,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private func cleanupNotchWindow() {
         screenParametersDebounceTimer?.invalidate()
         screenParametersDebounceTimer = nil
+        notchScreenRefreshRetryWorkItem?.cancel()
+        notchScreenRefreshRetryWorkItem = nil
 
         for window in notchWindows {
             cgsSpace?.windows.remove(window)
@@ -1222,6 +1253,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     private var isCreatingNotchWindow = false
     private var liveActivityStartTask: Task<Void, Never>?
+    private var notchScreenRefreshGeneration = 0
 
     func createNotchWindow() {
         guard !isCreatingNotchWindow else { return }
@@ -1229,18 +1261,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         defer { isCreatingNotchWindow = false }
 
         let targetScreens = targetNotchScreens()
-        guard !targetScreens.isEmpty else { return }
+        guard !targetScreens.isEmpty else {
+            cleanupNotchWindows(excluding: [])
+            return
+        }
 
-        // Remove existing windows that are no longer needed
-        cleanupNotchWindows(excluding: targetScreens)
+        let targetDisplayIDs = Set(targetScreens.compactMap { displayID(for: $0) })
+        guard !targetDisplayIDs.isEmpty else { return }
 
-        // Create windows for screens that don't have one yet
+        cleanupNotchWindows(excluding: targetDisplayIDs)
+
+        var seenDisplayIDs: Set<CGDirectDisplayID> = []
+        notchWindows = notchWindows.filter { window in
+            guard let windowDisplayID = (window as? DynamicFocusWindow)?.displayID, windowDisplayID != 0 else {
+                return true
+            }
+            if seenDisplayIDs.contains(windowDisplayID) {
+                cgsSpace?.windows.remove(window)
+                window.orderOut(nil)
+                window.close()
+                return false
+            }
+            seenDisplayIDs.insert(windowDisplayID)
+            return true
+        }
+
         for screen in targetScreens {
-            if notchWindows.contains(where: { $0.screen == screen && $0.isVisible }) {
-                // Update sharing type for existing window
-                if let existingWindow = notchWindows.first(where: { $0.screen == screen }) {
-                    existingWindow.sharingType = settingsModel.settings.hideFromScreenSharing ? .none : .readOnly
-                }
+            guard let screenDisplayID = displayID(for: screen) else { continue }
+            let existing = notchWindows.first { ($0 as? DynamicFocusWindow)?.displayID == screenDisplayID }
+            if let existing {
+                existing.sharingType = settingsModel.settings.hideFromScreenSharing ? .none : .readOnly
+                syncNotchWindowFrame(existing, to: screen)
                 continue
             }
 
@@ -1255,19 +1306,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         switch settings.notchDisplayTarget {
         case .macbookDisplay:
             if let target = NSScreen.screens.first(where: { screen in
-                if let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
-                    return CGDisplayIsBuiltin(displayID) != 0
+                guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+                    return false
                 }
-                return false
+                return CGDisplayIsBuiltin(displayID) != 0
             }) {
                 return [target]
             }
-            return [NSScreen.main].compactMap { $0 }
+            return []
         case .mainDisplay:
-            return [NSScreen.main].compactMap { $0 }
+            let mainDisplayID = CGMainDisplayID()
+            return NSScreen.screens.filter { displayID(for: $0) == mainDisplayID }
         case .allDisplays:
             return NSScreen.screens
         }
+    }
+
+    private func syncNotchWindowFrame(_ window: NSWindow, to screen: NSScreen) {
+        let screenFrame = screen.frame
+        let initialConfig = ResolvedNotchConfiguration(from: settingsModel.settings, screen: screen)
+        let paddedWidth = ceil(screenFrame.width)
+        let paddedHeight = ceil(max(initialConfig.initialSize.height + initialConfig.topBuffer + 24, screenFrame.height * 0.42))
+        let targetRect = NSRect(
+            x: screenFrame.minX,
+            y: screenFrame.maxY - paddedHeight,
+            width: paddedWidth,
+            height: paddedHeight
+        )
+
+        let current = window.frame
+        guard abs(current.origin.x - targetRect.origin.x) > 0.5
+            || abs(current.origin.y - targetRect.origin.y) > 0.5
+            || abs(current.width - targetRect.width) > 0.5
+            || abs(current.height - targetRect.height) > 0.5 else {
+            return
+        }
+
+        window.setFrame(targetRect, display: true, animate: false)
+        window.contentView?.frame = NSRect(origin: .zero, size: targetRect.size)
     }
 
     private func createNotchWindowForScreen(_ screen: NSScreen) {
@@ -1291,6 +1367,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
+        window.displayID = displayID(for: screen) ?? 0
         window.level = .statusBar
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         window.ignoresMouseEvents = true
@@ -1319,6 +1396,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 .environmentObject(focusModeManager)
                 .environmentObject(eyeBreakManager)
                 .environmentObject(timerManager)
+                .environmentObject(focusSessionManager)
                 .environmentObject(contentPickerHelper)
                 .environmentObject(geminiLiveManager)
                 .environmentObject(settingsModel)
@@ -1342,28 +1420,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         notchWindows.append(window)
     }
 
-    private func cleanupNotchWindows(excluding targetScreens: [NSScreen]) {
-        let targetScreenIDs = Set(targetScreens.map { $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID })
-        
+    private func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
+
+    private func cleanupNotchWindows(excluding targetScreenIDs: Set<CGDirectDisplayID>) {
         notchWindows = notchWindows.filter { window in
-            guard let screen = window.screen,
-                  let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-                // Remove window if we can't determine its screen
+            let windowDisplayID = (window as? DynamicFocusWindow)?.displayID
+                ?? (window.screen.flatMap { displayID(for: $0) } ?? 0)
+
+            let shouldKeep = windowDisplayID != 0 && targetScreenIDs.contains(windowDisplayID)
+            if !shouldKeep {
                 cgsSpace?.windows.remove(window)
                 window.orderOut(nil)
                 window.close()
-                return false
             }
-            
-            if !targetScreenIDs.contains(displayID) {
-                // Remove window if its screen is no longer in target screens
-                cgsSpace?.windows.remove(window)
-                window.orderOut(nil)
-                window.close()
-                return false
-            }
-            
-            return true
+            return shouldKeep
         }
     }
 
@@ -1372,6 +1444,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         liveActivityStartTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2.5))
             guard !Task.isCancelled else { return }
+            _ = self?.pillHUDController
             self?.liveActivityManager.start()
         }
     }
@@ -1402,6 +1475,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         previouslyFrontmostApp = nil
     }
 
+    func attachAuxiliaryNotchWindow(_ window: NSWindow) {
+        if cgsSpace == nil { cgsSpace = CGSSpace() }
+        cgsSpace?.windows.insert(window)
+    }
+
+    func detachAuxiliaryNotchWindow(_ window: NSWindow) {
+        cgsSpace?.windows.remove(window)
+    }
+
     func refreshNotchMousePassthrough() {
         for window in notchWindows {
             (window as? DynamicFocusWindow)?.syncMouseEventPassthrough()
@@ -1411,7 +1493,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     func updateNotchHostWindowHeight(requiredContentHeight: CGFloat) {
         for window in notchWindows {
             let targetScreen = window.screen ?? CursorPosition.targetNotchScreen()
-            guard let targetScreen else { return }
+            guard let targetScreen else { continue }
 
             let config = ResolvedNotchConfiguration(from: settingsModel.settings, screen: targetScreen)
             let baselineHeight = max(
@@ -1422,7 +1504,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             let paddedHeight = min(ceil(desiredHeight), targetScreen.visibleFrame.height)
             var frame = window.frame
             let newY = targetScreen.frame.maxY - paddedHeight
-            guard abs(frame.height - paddedHeight) > 2 || abs(frame.origin.y - newY) > 2 else { return }
+            guard abs(frame.height - paddedHeight) > 2 || abs(frame.origin.y - newY) > 2 else { continue }
             frame.origin.y = newY
             frame.size.height = paddedHeight
             window.setFrame(frame, display: true, animate: false)
@@ -1533,7 +1615,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self else { return }
             self.restoreAgentActivationIfNeeded()
-            MemoryTrimSupport.trimAfterUserWindowClose(musicManager: self.musicManager)
+            SettingsModel.shared.flushPendingSave()
+            SystemAppFetcher.shared.releaseCachedApps()
+            AppIconLoader.releaseCache()
         }
     }
 
@@ -1548,6 +1632,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - Screen Parameters
 
     private var screenParametersDebounceTimer: Timer?
+    private var notchScreenRefreshRetryWorkItem: DispatchWorkItem?
 
     @objc func handleAccountPaneOpened() {
         print("[AppDelegate] Account pane opened — refreshing subscription status.")
@@ -1563,9 +1648,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     @objc func screenParametersChanged(notification: Notification) {
         screenParametersDebounceTimer?.invalidate()
+        notchScreenRefreshRetryWorkItem?.cancel()
+        notchScreenRefreshGeneration += 1
+        let generation = notchScreenRefreshGeneration
+
         screenParametersDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
-            self?.createNotchWindow()
+            guard let self else { return }
+            self.refreshNotchScreens(generation: generation, attempt: 0)
         }
+    }
+
+    private func refreshNotchScreens(generation: Int, attempt: Int) {
+        guard isMainAppRunning, generation == notchScreenRefreshGeneration else { return }
+
+        createNotchWindow()
+
+        let hasResolvedTarget = !targetNotchScreens().isEmpty
+        guard attempt < 12 || !hasResolvedTarget else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.refreshNotchScreens(generation: generation, attempt: attempt + 1)
+        }
+        notchScreenRefreshRetryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
 
     // MARK: - Launch at Login
@@ -1644,6 +1749,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.notification.request.content.categoryIdentifier == SapphireBrowserIntegration.linkNotificationCategory {
+            SapphireBrowserIntegration.shared.handleLinkNotificationResponse(response)
+            completionHandler()
+            return
+        }
         if let transferID = response.notification.request.content.userInfo["transferID"] as? String {
             let accepted = response.actionIdentifier == "ACCEPT"
             NearbyConnectionManager.shared.submitUserConsent(transferID: transferID, accept: accepted)

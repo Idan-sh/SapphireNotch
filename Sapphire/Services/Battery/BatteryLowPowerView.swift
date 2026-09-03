@@ -54,7 +54,7 @@ struct BatteryLowPowerView: View {
             .buttonStyle(.sapphireInteractive())
             .padding(.horizontal, 10)
             .padding(12)
-            .padding(.top, 0)
+            .padding(.top, NotchConfiguration.universalHeight)
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark.circle.fill")

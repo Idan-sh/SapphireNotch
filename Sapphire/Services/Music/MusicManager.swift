@@ -22,12 +22,14 @@ class MusicManager: ObservableObject {
     lazy var spotifyAppleScript = SpotifyAppleScriptManager.shared
     lazy var spotifyOfficialAPI = SpotifyOfficialAPIManager.shared
     lazy var spotifyPrivateAPI = SpotifyPrivateAPIManager.shared
+    lazy var appleMusicPrivateAPI = AppleMusicPrivateAPIManager.shared
     lazy var browserAppleScript = BrowserAppleScriptManager.shared
 
     // MARK: - Proxied Authentication States
     @Published var officialAPIHasKeys: Bool = false
     @Published var isOfficialAPIAuthenticated: Bool = false
     @Published var isPrivateAPIAuthenticated: Bool = false
+    @Published var isAppleMusicPrivateAPIAuthenticated: Bool = false
     @Published var isPremiumUser: Bool = false
 
     // MARK: - Published UI State
@@ -197,6 +199,9 @@ class MusicManager: ObservableObject {
     @Published var playCount: String?
     @Published private(set) var playCountValue: Int?
     @Published var fetchedSpotifyPopularity: Int?
+    @Published var applePlayCount: Int?
+    @Published var applePopularity: Int?
+    @Published var appleSuggestedTracks: [AppleMusicSong] = []
     @Published var isLiked: Bool = false
     @Published var shuffleState: Bool = false
     @Published var repeatState: RepeatMode = .off
@@ -234,8 +239,8 @@ class MusicManager: ObservableObject {
     @Published private(set) var isMusicLiveActivityActive: Bool = false
     private(set) var systemVolume: Float = 0.0
 
-    @Published private(set) var currentElapsedTime: TimeInterval = 0
-    @Published private(set) var playbackProgress: Double = 0.0
+    private(set) var currentElapsedTime: TimeInterval = 0
+    private(set) var playbackProgress: Double = 0.0
 
     // MARK: - Private Properties
     private let mediaController = NativeMediaController()
@@ -306,6 +311,7 @@ class MusicManager: ObservableObject {
         spotifyOfficialAPI.$hasApiKeys.assign(to: &$officialAPIHasKeys)
         spotifyOfficialAPI.$isAuthenticated.assign(to: &$isOfficialAPIAuthenticated)
         spotifyPrivateAPI.$isLoggedIn.assign(to: &$isPrivateAPIAuthenticated)
+        appleMusicPrivateAPI.$isLoggedIn.assign(to: &$isAppleMusicPrivateAPIAuthenticated)
         spotifyOfficialAPI.$isPremiumUser.assign(to: &$isPremiumUser)
 
         spotifyPrivateAPI.$isLoggedIn
@@ -480,6 +486,15 @@ class MusicManager: ObservableObject {
             .sink { [weak self] bundleID in
                 guard let self, bundleID == "com.spotify.client" else { return }
                 self.spotifyPrivateAPI.bootstrapIfNeeded(policy: .onDemand)
+            }
+            .store(in: &cancellables)
+
+        $lastKnownBundleID
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] bundleID in
+                guard let self, bundleID == "com.apple.Music" else { return }
+                guard !self.appleMusic.isMusicKitAuthorized, self.appleMusic.isMusicKitConfigured else { return }
+                Task { await self.appleMusic.requestAuthorization() }
             }
             .store(in: &cancellables)
     }
@@ -1098,8 +1113,7 @@ class MusicManager: ObservableObject {
 
         guard let bundle = bundleID(fromSourceKey: key), !bundle.isEmpty else { return false }
 
-        let isAppRunning = NSWorkspace.shared.runningApplications.contains { app in
-            guard let appBundle = app.bundleIdentifier else { return false }
+        let isAppRunning = RunningApps.shared.containsBundleID { appBundle in
             let normalizedApp = normalizeBundleID(appBundle) ?? appBundle
             return normalizedApp == bundle || appBundle == bundle
         }
@@ -1270,6 +1284,13 @@ class MusicManager: ObservableObject {
         var success = false
         if self.lastKnownBundleID == "com.apple.Music" {
             appleMusic.setLiked(isLiked: newLikedState)
+            Task { [weak self] in
+                guard let self else { return }
+                if let songID = await appleMusicPrivateAPI.currentTrackSongID(),
+                   appleMusicPrivateAPI.isLoggedIn {
+                    _ = await appleMusicPrivateAPI.setFavorite(songID: songID, favorite: newLikedState)
+                }
+            }
             success = true
         } else if isSpotifySourceSelected {
             let trackURI: String? = {
@@ -1598,7 +1619,7 @@ class MusicManager: ObservableObject {
                     self.applyPlaybackRefresh(track.payload)
                 } else if self.hasMediaChanged(track.payload) {
                     self.applyTrackPayload(track.payload, sourceKey: key)
-                } else if track.payload.artwork != nil && self.artwork == nil {
+                } else if let payloadArtwork = track.payload.artwork, payloadArtwork !== self.artwork {
                     self.applyTrackPayload(track.payload, sourceKey: key)
                 } else {
                     self.applyPlaybackRefresh(track.payload)
@@ -1621,7 +1642,7 @@ class MusicManager: ObservableObject {
                     self.applyTrackPayload(track.payload, sourceKey: newKey)
                 } else {
                     self.applyPlaybackRefresh(track.payload)
-                    if track.payload.artwork != nil && self.artwork == nil {
+                    if let payloadArtwork = track.payload.artwork, payloadArtwork !== self.artwork {
                         self.applyTrackPayload(track.payload, sourceKey: newKey)
                     }
                 }
@@ -1988,6 +2009,9 @@ class MusicManager: ObservableObject {
 
         if let newArtwork = payload.artwork {
             self.applyArtwork(newArtwork, trackIdentity: trackIdentity)
+        } else if switchingAwayFromSpotify {
+            self.artwork = nil
+            self.artworkURL = nil
         }
 
         if let newIsPlaying = resolvedIsPlaying(from: payload) {
@@ -2065,12 +2089,15 @@ class MusicManager: ObservableObject {
         let generation = trackMetadataGeneration
 
         self.popularity = nil; self.playCount = nil; self.playCountValue = nil; self.isLiked = false
+        self.applePlayCount = nil; self.applePopularity = nil; self.appleSuggestedTracks = []
 
         if self.lastKnownBundleID == "com.apple.Music" {
             guard generation == self.trackMetadataGeneration else { return }
             self.isLiked = appleMusic.isTrackLiked()
             self.shuffleState = appleMusic.getShuffleState()
             self.repeatState = appleMusic.getRepeatState()
+            await enrichAppleMusicTrackStats(generation: generation)
+            guard generation == self.trackMetadataGeneration else { return }
             if needsLyricsUpdates || isDetailPlayerOpen {
                 await fetchAndTranslateLyricsIfNeeded()
             }
@@ -2125,6 +2152,25 @@ class MusicManager: ObservableObject {
                     await fetchAndTranslateLyricsIfNeeded()
                 }
             }
+        }
+    }
+
+    private func enrichAppleMusicTrackStats(generation: UInt64) async {
+        guard lastKnownBundleID == "com.apple.Music" else { return }
+        guard appleMusic.isMusicKitAuthorized else { return }
+        guard generation == trackMetadataGeneration else { return }
+        let songID = trackID
+        guard let songID, !songID.isEmpty else { return }
+        let playCount: Int? = nil
+        let popularity: Int? = nil
+        guard generation == trackMetadataGeneration else { return }
+        if let playCount { applePlayCount = playCount }
+        if let popularity { applePopularity = popularity }
+
+        if let artistName = self.artist, !artistName.isEmpty {
+            let suggested = await appleMusic.suggestedTracks(artistName: artistName)
+            guard generation == trackMetadataGeneration else { return }
+            self.appleSuggestedTracks = suggested
         }
     }
 
@@ -2467,6 +2513,7 @@ class MusicManager: ObservableObject {
         lastPublishedTransitionURI = nil
         lastPublishedTransitionFingerprint = nil
         self.uri = nil; self.trackID = nil; self.popularity = nil; self.playCount = nil; self.playCountValue = nil
+        self.applePlayCount = nil; self.applePopularity = nil; self.appleSuggestedTracks = []
         self.isPlaying = false; self.totalDuration = 0; self.currentElapsedTime = 0
         self.lastHandledTrackKey = nil
         self.resetLyricsState()
@@ -2482,12 +2529,16 @@ class MusicManager: ObservableObject {
             && settingsModel.settings.musicLiveActivityEnabled
             && ActiveAppMonitor.shared.isLyricsAllowedForActiveApp
             && !lyrics.isEmpty
+        let needsUpNextLiveActivity = isMusicLiveActivityActive
+            && settingsModel.settings.spotifyShowNextSong
+            && settingsModel.settings.musicLiveActivityEnabled
+            && (isSpotifySourceActive || isSpotifyLiveSourceSelected || lastKnownBundleID == "com.apple.Music")
 
-        let shouldTick = isPlaying && (needsProgressUI || needsLyricLiveActivity)
+        let shouldTick = isPlaying && (needsProgressUI || needsLyricLiveActivity || needsUpNextLiveActivity)
 
         if shouldTick {
             if liveActivityTimer == nil {
-                let interval = needsProgressUI ? 0.1 : 0.5
+                let interval = needsProgressUI ? 0.2 : 0.5
                 let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.isPlaying else { return }
@@ -3135,7 +3186,9 @@ class MusicManager: ObservableObject {
     func updateAirPlayDevices() async {
         airPlay.startDiscovery()
         airPlay.refresh()
-        self.airplayDevices = airPlay.devices
+        let devices = airPlay.devices
+        guard devices != airplayDevices else { return }
+        self.airplayDevices = devices
     }
 
     @discardableResult

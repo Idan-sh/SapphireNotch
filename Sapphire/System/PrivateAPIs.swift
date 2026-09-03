@@ -129,10 +129,45 @@ internal func CGSGetScreenRectForWindow(
     _ outRect: inout CGRect
 ) -> CGError
 
+// MARK: - CGSWindow Group Functions (child window attachment)
+
+@_silgen_name("CGSAddWindowToWindowOrderingGroup")
+internal func CGSAddWindowToWindowOrderingGroup(
+    _ cid: CGSConnectionID,
+    _ child: CGWindowID,
+    _ parent: CGWindowID
+) -> CGError
+
+@_silgen_name("CGSRemoveFromOrderingGroup")
+internal func CGSRemoveFromOrderingGroup(
+    _ cid: CGSConnectionID,
+    _ window: CGWindowID
+) -> CGError
+
+@_silgen_name("CGSAddWindowToWindowMovementGroup")
+internal func CGSAddWindowToWindowMovementGroup(
+    _ cid: CGSConnectionID,
+    _ child: CGWindowID,
+    _ parent: CGWindowID
+) -> CGError
+
+@_silgen_name("CGSRemoveWindowFromWindowMovementGroup")
+internal func CGSRemoveWindowFromWindowMovementGroup(
+    _ cid: CGSConnectionID,
+    _ window: CGWindowID
+) -> CGError
+
+@_silgen_name("CGSOrderWindow")
+internal func CGSOrderWindow(
+    _ cid: CGSConnectionID,
+    _ wid: CGWindowID,
+    _ place: Int32,
+    _ relativeToWid: CGWindowID
+) -> CGError
+
 // MARK: - CGSConnection Functions
 @_silgen_name("_CGSDefaultConnection") internal func _CGSDefaultConnection() -> CGSConnectionID
 @_silgen_name("CGSGetConnectionProperty") internal func CGSGetConnectionProperty(_ cid: CGSConnectionID, _ key: CFString) -> Unmanaged<CFTypeRef>
-@_silgen_name("CGSSetConnectionProperty") internal func CGSSetConnectionProperty(_ cid: CGSConnectionID, _ key: CFString, _ value: CFTypeRef) -> CGError
 
 @_silgen_name("CGSSpaceCreate")
 fileprivate func CGSSpaceCreate(_ cid: CGSConnectionID, _ unknown: Int, _ options: NSDictionary?) -> CGSSpaceID
@@ -457,6 +492,34 @@ struct CGSHelper {
         }
 
         return nil
+    }
+    static func getActiveDesktopNumbersByDisplay() -> [String: Int] {
+        let activeSpaceID = CGSGetActiveSpace(connection)
+        var result: [String: Int] = [:]
+
+        guard let displaySpaces = CGSCopyManagedDisplaySpaces(connection) as? [[String: Any]] else {
+            return result
+        }
+
+        for displayEntry in displaySpaces {
+            guard let displayIdentifier = displayEntry["Display Identifier"] as? String,
+                  let spaces = displayEntry["Spaces"] as? [[String: Any]] else {
+                continue
+            }
+
+            var activeIndex: Int?
+            if let idx = spaces.firstIndex(where: { ($0["id64"] as? CGSSpaceID) == activeSpaceID }) {
+                activeIndex = idx
+            } else if let idx = spaces.firstIndex(where: { ($0["is-current"] as? Bool) == true }) {
+                activeIndex = idx
+            }
+
+            if let index = activeIndex {
+                result[displayIdentifier] = index + 1
+            }
+        }
+
+        return result
     }
 }
 
