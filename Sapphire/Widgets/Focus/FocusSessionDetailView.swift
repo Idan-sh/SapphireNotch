@@ -440,16 +440,6 @@ struct FocusSessionDetailView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                 quickToggleChip(
-                    title: "Dim Apps",
-                    icon: "moon.fill",
-                    isOn: $settings.settings.focusDimInactiveApps
-                )
-                quickToggleChip(
-                    title: "Mission Ctl",
-                    icon: "rectangle.inset.filled",
-                    isOn: $settings.settings.focusDisableDimInMissionControl
-                )
-                quickToggleChip(
                     title: "Hide Wall",
                     icon: "photo.fill",
                     isOn: $settings.settings.focusHideWallpaper

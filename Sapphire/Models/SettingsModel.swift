@@ -892,9 +892,6 @@ struct Settings: Codable, Equatable {
     var focusBlockedApps: Set<String> = []
     var focusAllowedApps: Set<String> = []
 
-    var focusDimInactiveApps: Bool = true
-    var focusDimInactiveOpacity: Double = 0.45
-    var focusDisableDimInMissionControl: Bool = false
     var focusHideWallpaper: Bool = false
     var focusAppLimitEnabled: Bool = false
     var focusAppLimit: Int = 2
@@ -904,7 +901,7 @@ struct Settings: Codable, Equatable {
     var focusStartShortcutName: String = ""
     var focusEndShortcutName: String = ""
     var focusBlockedWebsites: Set<String> = []
-    var focusStartShortcut: KeyboardShortcut = KeyboardShortcut(key: "F", modifiers: [.command, .shift])
+    var focusStartShortcut: KeyboardShortcut = KeyboardShortcut(key: "", modifiers: [])
     var clickToShowFocusSessionView: Bool = true
     var focusShortcutsEnabled: Bool = false
     var focusShortcutSyncMode: FocusShortcutSyncMode = .none
@@ -1674,6 +1671,15 @@ class SettingsModel: ObservableObject {
             loaded.focusBreakEnabled = false
             loaded.focusBreakDuration = 0
             defaults.set(true, forKey: "focusDefaultsAppliedV1")
+        }
+
+        if defaults.object(forKey: "focusDimFeatureRemovedV1") == nil {
+            // Dim overlays were removed; clear the old default ⌘⇧F hotkey so it can't strand users.
+            if loaded.focusStartShortcut.key.uppercased() == "F",
+               loaded.focusStartShortcut.significantModifiers == [.command, .shift] {
+                loaded.focusStartShortcut = KeyboardShortcut(key: "", modifiers: [])
+            }
+            defaults.set(true, forKey: "focusDimFeatureRemovedV1")
         }
 
         loaded.disableUnavailablePremiumFeatures()

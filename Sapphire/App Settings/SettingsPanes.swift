@@ -11031,23 +11031,6 @@ struct FocusSessionSettingsView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 8)
 
-            ToggleRow(title: "Dim Inactive Apps", description: "Darken windows you're not using so the active app stands out and visual clutter recedes.", isOn: $settings.settings.focusDimInactiveApps)
-            if settings.settings.focusDimInactiveApps {
-                Divider().opacity(0.3).padding(.horizontal, 16)
-                HStack {
-                    Text("Dim Intensity:")
-                        .font(.system(size: 13))
-                    Spacer()
-                    Slider(value: $settings.settings.focusDimInactiveOpacity, in: 0.2...1.0)
-                        .frame(width: 160)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 10)
-
-                Divider().opacity(0.3).padding(.horizontal, 16)
-                ToggleRow(title: "Pause in Mission Control", description: "Temporarily remove the dim layer while Mission Control is open so you can actually see the apps in the Exposé grid.", isOn: $settings.settings.focusDisableDimInMissionControl)
-            }
-
-            Divider().opacity(0.3).padding(.horizontal, 16)
             ToggleRow(title: "Hide Wallpaper", description: "Cover the desktop wallpaper and icons with black for the duration of the session.", isOn: $settings.settings.focusHideWallpaper)
 
             Divider().opacity(0.3).padding(.horizontal, 16)

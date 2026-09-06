@@ -746,9 +746,6 @@ final class FocusSessionManager: ObservableObject {
     private func syncEnvironment() {
         let settings = settingsModel.settings
         environmentManager.configure(
-            dimInactive: settings.focusDimInactiveApps,
-            dimOpacity: settings.focusDimInactiveOpacity,
-            disableDimInMissionControl: settings.focusDisableDimInMissionControl,
             hideWallpaper: settings.focusHideWallpaper,
             appLimitEnabled: settings.focusAppLimitEnabled,
             appLimit: settings.focusAppLimit
