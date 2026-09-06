@@ -16,17 +16,6 @@ extension Notification.Name {
     static let activeAppDidChange = Notification.Name("com.sapphire.activeAppDidChange")
 }
 
-private func axObserverCallback(
-    _ observer: AXObserver,
-    _ element: AXUIElement,
-    _ notification: CFString,
-    _ refcon: UnsafeMutableRawPointer?
-) {
-    guard let refcon = refcon else { return }
-    let monitor = Unmanaged<ActiveAppMonitor>.fromOpaque(refcon).takeUnretainedValue()
-    monitor.handleWindowMoved()
-}
-
 @MainActor
 class ActiveAppMonitor: ObservableObject {
 
@@ -44,13 +33,16 @@ class ActiveAppMonitor: ObservableObject {
     private let kAXMainWindowAttribute = "AXMainWindow" as CFString
     private let kAXFullScreenAttribute = "AXFullScreen" as CFString
 
-    private var axObserver: AXObserver?
+    private var mouseDragMonitor: Any?
     private var mouseUpMonitor: Any?
-    private var lastMoveTime: TimeInterval = 0
+    private var lastDragCheckTime: TimeInterval = 0
+    private var dragStartWindowOrigins: [CGWindowID: CGPoint] = [:]
+    private var lastWindowDragObservationEnabled: Bool?
+    private let windowDragOriginThreshold: CGFloat = 6
 
     deinit {
-        if let observer = axObserver {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        if let monitor = mouseDragMonitor {
+            NSEvent.removeMonitor(monitor)
         }
         if let monitor = mouseUpMonitor {
             NSEvent.removeMonitor(monitor)
@@ -75,17 +67,25 @@ class ActiveAppMonitor: ObservableObject {
 
         settingsModel.$settings
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateLyricPermission() }
+            .sink { [weak self] settings in
+                guard let self else { return }
+                self.updateLyricPermission()
+
+                let observationEnabled = settings.snapOnWindowDragEnabled || settings.snapDragEnabled
+                guard self.lastWindowDragObservationEnabled != observationEnabled else { return }
+                self.lastWindowDragObservationEnabled = observationEnabled
+                self.setupWindowDragMonitoring()
+            }
             .store(in: &cancellables)
 
         updateActiveAppState()
+        setupWindowDragMonitoring()
     }
 
     private func updateActiveAppState() {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication, let bundleID = frontmostApp.bundleIdentifier else {
             if isFullScreen != false { isFullScreen = false }
             if activeAppBundleID != nil { activeAppBundleID = nil }
-            teardownAXObserver()
             return
         }
         guard bundleID != Bundle.main.bundleIdentifier else {
@@ -95,8 +95,6 @@ class ActiveAppMonitor: ObservableObject {
         if activeAppBundleID != bundleID {
             activeAppBundleID = bundleID
             NotificationCenter.default.post(name: .activeAppDidChange, object: nil)
-
-            setupAXObserver(for: frontmostApp.processIdentifier)
         }
 
         let appElement = AXUIElementCreateApplication(frontmostApp.processIdentifier)
@@ -148,25 +146,109 @@ class ActiveAppMonitor: ObservableObject {
 
     // MARK: - Window Drag Detection
 
-    private func setupAXObserver(for pid: pid_t) {
-        teardownAXObserver()
+    private func setupWindowDragMonitoring() {
+        teardownWindowDragMonitoring()
 
-        guard settingsModel.settings.snapOnWindowDragEnabled else { return }
+        let settings = settingsModel.settings
+        let observationEnabled = settings.snapOnWindowDragEnabled || settings.snapDragEnabled
+        lastWindowDragObservationEnabled = observationEnabled
+        guard observationEnabled else { return }
 
-        var observer: AXObserver?
-        let result = AXObserverCreate(pid, axObserverCallback, &observer)
+        mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleMouseDraggedForWindowMove()
+            }
+        }
 
-        guard result == .success, let observer = observer else {
-            print("[ActiveAppMonitor] Failed to create AXObserver for PID \(pid)")
+        mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleMouseUpForWindowMove()
+            }
+        }
+    }
+
+    private func teardownWindowDragMonitoring() {
+        if let monitor = mouseDragMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseDragMonitor = nil
+        }
+        if let monitor = mouseUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseUpMonitor = nil
+        }
+        dragStartWindowOrigins.removeAll()
+        if isWindowDragging {
+            isWindowDragging = false
+        }
+    }
+
+    private func handleMouseDraggedForWindowMove() {
+        let now = CACurrentMediaTime()
+        if now - lastDragCheckTime < 0.03 { return }
+        lastDragCheckTime = now
+
+        guard NSEvent.pressedMouseButtons == 1 else { return }
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
+              frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier else {
             return
         }
 
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        let frames = layerZeroWindowFrames(for: frontmostApp.processIdentifier)
+        guard !frames.isEmpty else { return }
 
-        AXObserverAddNotification(observer, AXUIElementCreateApplication(pid), kAXWindowMovedNotification as CFString, selfPtr)
+        if dragStartWindowOrigins.isEmpty {
+            for (windowID, frame) in frames {
+                dragStartWindowOrigins[windowID] = frame.origin
+            }
+            return
+        }
 
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
-        self.axObserver = observer
+        for (windowID, frame) in frames {
+            guard let startOrigin = dragStartWindowOrigins[windowID] else {
+                // New window mid-drag (e.g. tab tear-off); wait until it moves.
+                dragStartWindowOrigins[windowID] = frame.origin
+                continue
+            }
+
+            let dx = abs(frame.origin.x - startOrigin.x)
+            let dy = abs(frame.origin.y - startOrigin.y)
+            if dx >= windowDragOriginThreshold || dy >= windowDragOriginThreshold {
+                isWindowDragging = true
+                return
+            }
+        }
+    }
+
+    private func handleMouseUpForWindowMove() {
+        dragStartWindowOrigins.removeAll()
+        if isWindowDragging {
+            isWindowDragging = false
+        }
+    }
+
+    private func layerZeroWindowFrames(for pid: pid_t) -> [CGWindowID: CGRect] {
+        guard let list = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return [:]
+        }
+
+        var result: [CGWindowID: CGRect] = [:]
+        for info in list {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == pid else { continue }
+            if let layer = info[kCGWindowLayer as String] as? Int, layer != 0 { continue }
+            guard let windowID = info[kCGWindowNumber as String] as? CGWindowID,
+                  let bounds = info[kCGWindowBounds as String] as? [String: CGFloat],
+                  let width = bounds["Width"], let height = bounds["Height"],
+                  width >= 200, height >= 120,
+                  let x = bounds["X"], let y = bounds["Y"] else {
+                continue
+            }
+            result[windowID] = CGRect(x: x, y: y, width: width, height: height)
+        }
+        return result
     }
 
     private func displayID(forFullScreenWindow windowElement: AXUIElement) -> CGDirectDisplayID? {
@@ -190,50 +272,5 @@ class ActiveAppMonitor: ObservableObject {
             return nil
         }
         return screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-    }
-
-    private func teardownAXObserver() {
-        if let observer = axObserver {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
-            axObserver = nil
-        }
-
-        if let monitor = mouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseUpMonitor = nil
-        }
-
-        if isWindowDragging {
-            isWindowDragging = false
-        }
-    }
-
-    nonisolated func handleWindowMoved() {
-        Task { @MainActor in
-            let now = CACurrentMediaTime()
-            if now - lastMoveTime < 0.016 { return }
-            lastMoveTime = now
-
-            guard NSEvent.pressedMouseButtons == 1 else { return }
-
-            if !self.isWindowDragging {
-                self.isWindowDragging = true
-                self.startMouseUpMonitoring()
-            }
-        }
-    }
-
-    private func startMouseUpMonitoring() {
-        guard mouseUpMonitor == nil else { return }
-
-        mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
-            Task { @MainActor in
-                self?.isWindowDragging = false
-                if let monitor = self?.mouseUpMonitor {
-                    NSEvent.removeMonitor(monitor)
-                    self?.mouseUpMonitor = nil
-                }
-            }
-        }
     }
 }

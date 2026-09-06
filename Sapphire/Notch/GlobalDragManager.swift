@@ -8,9 +8,6 @@
 import AppKit
 import Combine
 import QuartzCore
-import os.log
-
-private let dragLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Sapphire", category: "GlobalDragManager")
 
 @MainActor
 class GlobalDragManager: ObservableObject {
@@ -22,7 +19,7 @@ class GlobalDragManager: ObservableObject {
     private var upMonitor: Any?
     private var activationTimer: Timer?
     private var isInsideActivationRect: Bool = false
-    @MainActor private let dragState = DragStateManager.shared
+    private let dragState = DragStateManager.shared
 
     private var lastDragProcessTime: TimeInterval = 0
     private let dragThrottleInterval: TimeInterval = 0.05
@@ -32,8 +29,8 @@ class GlobalDragManager: ObservableObject {
     func startMonitoring() {
         guard dragMonitor == nil else { return }
 
-        dragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] event in
-            self?.handleDrag(event: event)
+        dragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] _ in
+            self?.handleDrag()
         }
     }
 
@@ -53,7 +50,7 @@ class GlobalDragManager: ObservableObject {
         guard upMonitor == nil else { return }
 
         upMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.endDrag()
             }
         }
@@ -79,14 +76,14 @@ class GlobalDragManager: ObservableObject {
         isInsideActivationRect = false
     }
 
-    private func handleDrag(event: NSEvent) {
+    private func handleDrag() {
         let now = CACurrentMediaTime()
         if now - lastDragProcessTime < dragThrottleInterval {
             return
         }
         lastDragProcessTime = now
 
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.processDrag()
         }
     }
@@ -100,7 +97,6 @@ class GlobalDragManager: ObservableObject {
         let zoneHeight: CGFloat = 43
 
         guard let screenWithCursor = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) else {
-            dragLog.info("processDrag: no screen contains mouse=\(mouseLocation.x),\(mouseLocation.y); screens=\(NSScreen.screens.map { "\($0.frame.minX),\($0.frame.minY)-\($0.frame.maxX),\($0.frame.maxY)" })")
             isInsideActivationRect = false
             activationTimer?.invalidate()
             activationTimer = nil
@@ -131,35 +127,64 @@ class GlobalDragManager: ObservableObject {
             )
         }
 
-        let screen = screenWithCursor
-        let screenFrame = screen.frame
-        let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
-        let menuBarHeight = max(0, screen.frame.height - screen.visibleFrame.height)
-
-        if activationRect.contains(mouseLocation) {
-            if !isInsideActivationRect {
-                dragLog.info("drag activation zone entered on displayID=\(displayID) mouse=\(mouseLocation.x),\(mouseLocation.y) screenFrame=\(screenFrame.minX),\(screenFrame.minY)-\(screenFrame.maxX),\(screenFrame.maxY) visibleFrame=\(screen.visibleFrame.minX),\(screen.visibleFrame.minY)-\(screen.visibleFrame.maxX),\(screen.visibleFrame.maxY) menuBarHeight=\(menuBarHeight) activationRect=\(activationRect.minX),\(activationRect.minY)-\(activationRect.maxX),\(activationRect.maxY)")
-                isInsideActivationRect = true
-                activationTimer?.invalidate()
-                let delay = max(0.05, SettingsModel.shared.settings.snapActivationDelay)
-                activationTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-                    guard let self = self else { return }
-                    let currentLocation = NSEvent.mouseLocation
-
-                    if activationRect.contains(currentLocation) && !self.isDraggingInActivationZone {
-                        dragLog.info("drag activation zone engaged on displayID=\(displayID)")
-                        self.isDraggingInActivationZone = true
-                        self.startMouseUpMonitoring()
-                    }
-                }
-            }
+        guard activationRect.contains(mouseLocation) else {
+            isInsideActivationRect = false
+            activationTimer?.invalidate()
+            activationTimer = nil
             return
-        } else {
-            dragLog.info("processDrag: mouse NOT in activation rect on displayID=\(displayID) mouse=\(mouseLocation.x),\(mouseLocation.y) activationRect=\(activationRect.minX),\(activationRect.minY)-\(activationRect.maxX),\(activationRect.maxY) menuBarHeight=\(menuBarHeight) visibleFrameMaxY=\(screen.visibleFrame.maxY)")
         }
 
-        isInsideActivationRect = false
+        // Ignore in-app gestures near the notch (tab reorder, text selection, etc.).
+        guard hasActiveDragSession() else {
+            if isInsideActivationRect {
+                isInsideActivationRect = false
+                activationTimer?.invalidate()
+                activationTimer = nil
+            }
+            return
+        }
+
+        guard !isInsideActivationRect else { return }
+
+        isInsideActivationRect = true
         activationTimer?.invalidate()
-        activationTimer = nil
+        let delay = max(0.05, SettingsModel.shared.settings.snapActivationDelay)
+        activationTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            guard self.hasActiveDragSession(),
+                  activationRect.contains(NSEvent.mouseLocation),
+                  !self.isDraggingInActivationZone else { return }
+
+            self.isDraggingInActivationZone = true
+            self.startMouseUpMonitoring()
+        }
+    }
+
+    private func hasActiveDragSession() -> Bool {
+        ActiveAppMonitor.shared.isWindowDragging || hasFileURLDragSession()
+    }
+
+    private func hasFileURLDragSession() -> Bool {
+        let pasteboard = NSPasteboard(name: .drag)
+
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true
+        ]) as? [URL], urls.contains(where: \.isFileURL) {
+            return true
+        }
+
+        if pasteboard.types?.contains(.fileURL) == true {
+            return true
+        }
+
+        for item in pasteboard.pasteboardItems ?? [] {
+            guard let path = item.string(forType: .fileURL) else { continue }
+            let decoded = path.removingPercentEncoding ?? path
+            if decoded.hasPrefix("file:") || decoded.hasPrefix("/") {
+                return true
+            }
+        }
+
+        return false
     }
 }
