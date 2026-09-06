@@ -188,25 +188,31 @@ private struct LyricTextView: View {
             let lyricText = line?.translatedText ?? line?.text
             let trimmed = lyricText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-            if !trimmed.isEmpty {
-                Text(trimmed)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(musicManager.accentColor)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: line?.id)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if let onCustomTap {
-                            onCustomTap()
-                        } else if isLockScreenMode {
-                            navigationManager.navigateTo(.lyrics)
-                        } else {
-                            navigationStack.append(.musicLyrics)
-                        }
-                    }
+            Group {
+                if !trimmed.isEmpty {
+                    Text(trimmed)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(musicManager.accentColor)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                } else {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(musicManager.accentColor.opacity(0.55))
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
+            .contentTransition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: line?.id)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if let onCustomTap {
+                    onCustomTap()
+                } else if isLockScreenMode {
+                    navigationManager.navigateTo(.lyrics)
+                } else {
+                    navigationStack.append(.musicLyrics)
+                }
             }
         }
     }
@@ -571,14 +577,6 @@ struct MusicPlayerView: View {
                         .padding(.top, 1)
                     }
 
-                    if musicManager.hasCurrentDisplayableLyric {
-                        LyricTextView(
-                            navigationStack: $navigationStack,
-                            isLockScreenMode: isLockScreenMode,
-                            onCustomTap: onLyricsTap
-                        )
-                    }
-
                     HStack {
                         MusicPlayerActionButton(type: primaryButtons.first, size: .primary)
                         Spacer()
@@ -637,12 +635,20 @@ struct MusicPlayerView: View {
                         MusicPlayerActionButton(type: primaryButtons.dropFirst().first, size: .primary)
                     }
                     .buttonStyle(.sapphireInteractive()).font(.system(size: 22)).foregroundColor(.primary)
-                    .padding(.top, (!musicManager.hasCurrentDisplayableLyric && accessoryButtons.isEmpty) ? 8 : 0)
-                    .padding(.bottom, !musicManager.hasCurrentDisplayableLyric ? 4 : 0)
+                    .padding(.top, accessoryButtons.isEmpty && !musicManager.hasDisplayableLyrics ? 8 : 0)
+                    .padding(.bottom, musicManager.hasDisplayableLyrics ? 0 : 4)
 
                     if !accessoryButtons.isEmpty {
                         HStack(spacing: 25) { ForEach(accessoryButtons) { buttonType in MusicPlayerActionButton(type: buttonType, size: .accessory) } }
                         .frame(maxWidth: .infinity).padding(.top, 4)
+                    }
+
+                    if musicManager.hasDisplayableLyrics {
+                        LyricTextView(
+                            navigationStack: $navigationStack,
+                            isLockScreenMode: isLockScreenMode,
+                            onCustomTap: onLyricsTap
+                        )
                     }
         }
     }
