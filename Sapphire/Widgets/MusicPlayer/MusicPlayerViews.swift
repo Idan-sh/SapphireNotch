@@ -182,28 +182,40 @@ private struct LyricTextView: View {
     let isLockScreenMode: Bool
     var onCustomTap: (() -> Void)? = nil
 
+    private var lineTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .bottom).combined(with: .opacity),
+            removal: .move(edge: .top).combined(with: .opacity)
+        )
+    }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: musicManager.isPlaying ? 0.25 : 60)) { context in
             let line = musicManager.lyricLine(at: context.date)
             let lyricText = line?.translatedText ?? line?.text
             let trimmed = lyricText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let identity = trimmed.isEmpty ? "placeholder" : (line?.id.uuidString ?? trimmed)
 
-            Group {
+            ZStack {
                 if !trimmed.isEmpty {
                     Text(trimmed)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(musicManager.accentColor)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
+                        .id(identity)
+                        .transition(lineTransition)
                 } else {
                     Image(systemName: "music.note")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(musicManager.accentColor.opacity(0.55))
+                        .id(identity)
+                        .transition(lineTransition)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
-            .contentTransition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: line?.id)
+            .frame(maxWidth: .infinity, minHeight: 35, maxHeight: 35, alignment: .center)
+            .clipped()
+            .animation(.easeInOut(duration: 0.35), value: identity)
             .contentShape(Rectangle())
             .onTapGesture {
                 if let onCustomTap {
