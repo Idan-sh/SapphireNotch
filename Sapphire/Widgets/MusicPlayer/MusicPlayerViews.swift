@@ -447,11 +447,11 @@ struct MusicPlayerView: View {
                         identity: "track-\(musicManager.uri ?? musicManager.title ?? "")-\(musicManager.artist ?? "")"
                     ) {
                         VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
-                                Text(musicManager.title ?? "Title")
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                    .lineLimit(1)
-                            }
+                            Text(musicManager.title ?? "Title")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
                             if let artist = spotifyArtist {
                                 HStack(spacing: 6) {
@@ -488,9 +488,12 @@ struct MusicPlayerView: View {
                                     .lineLimit(1)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .buttonStyle(.sapphireInteractive())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
                 Spacer(minLength: 4)
 
@@ -525,7 +528,9 @@ struct MusicPlayerView: View {
                             .transition(.opacity)
                     }
                 }
-                .frame(minWidth: 110, maxWidth: 168, alignment: .trailing)
+                // Hug trailing content so unused reserved width no longer steals space from the title.
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(0)
                 .animation(.easeInOut(duration: 0.2), value: nextTrackPillInfo?.title)
             }
     }
@@ -988,10 +993,11 @@ struct NextTrackInline: View {
                             .truncationMode(.tail)
                     }
                 }
-                .frame(alignment: .leading)
+                .frame(maxWidth: 120, alignment: .leading)
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 5)
+            .fixedSize(horizontal: true, vertical: false)
             .frame(alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
