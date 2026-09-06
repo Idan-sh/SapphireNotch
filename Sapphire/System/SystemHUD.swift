@@ -940,6 +940,22 @@ class SystemHUDManager: ObservableObject {
          currentSpotifyVolumeForAction = percent
          lastCommittedSpotifyVolume = percent
      }
+
+     /// Applies a HUD brightness drag to the matching display (DDC for externals, DisplayServices for Apple/built-in).
+     @MainActor
+     func brightnessSliderDragged(displayId: CGDirectDisplayID, level: Float) {
+         guard let display = displayManager.getAllDisplays().first(where: { $0.identifier == displayId }) else { return }
+         let clamped = max(0, min(1, level))
+         _ = display.setBrightness(clamped)
+
+         if case .multiDisplayBrightness(var displays) = currentHUD,
+            let index = displays.firstIndex(where: { $0.id == displayId }) {
+             displays[index].level = clamped
+             updateCurrentHUD(to: .multiDisplayBrightness(displays: displays))
+         } else {
+             updateCurrentHUD(to: .brightness(level: clamped))
+         }
+     }
 }
 
 struct SystemHUDView: View {
@@ -1091,6 +1107,7 @@ struct SystemHUDView: View {
                 deviceIcon: "display",
                 canControlVolume: true,
                 isBrightness: true,
+                displayId: display.id,
                 showName: displayCount > 2
             )
             .transition(.opacity.combined(with: .offset(y: 5)))
@@ -1212,11 +1229,12 @@ struct ExternalDeviceIndicatorHUD: View {
     var appIcon: NSImage? = nil
     var canControlVolume: Bool = true
     var isBrightness: Bool = false
+    var displayId: CGDirectDisplayID? = nil
     var showName: Bool = true
 
     private let sliderDebouncer = Debouncer(delay: 0.2)
 
-    init(level: Float, deviceName: String, deviceIcon: String, appIcon: NSImage? = nil, canControlVolume: Bool = true, isBrightness: Bool = false, showName: Bool = true) {
+    init(level: Float, deviceName: String, deviceIcon: String, appIcon: NSImage? = nil, canControlVolume: Bool = true, isBrightness: Bool = false, displayId: CGDirectDisplayID? = nil, showName: Bool = true) {
         self.externalLevel = level
         self._level = State(initialValue: level)
         self.deviceName = deviceName
@@ -1224,6 +1242,7 @@ struct ExternalDeviceIndicatorHUD: View {
         self.appIcon = appIcon
         self.canControlVolume = canControlVolume
         self.isBrightness = isBrightness
+        self.displayId = displayId
         self.showName = showName
     }
 
@@ -1259,7 +1278,9 @@ struct ExternalDeviceIndicatorHUD: View {
                                 set: { newValue in
                                     let newLevel = Float(newValue)
                                     level = newLevel
-                                    if !isBrightness {
+                                    if isBrightness, let displayId {
+                                        SystemHUDManager.shared.brightnessSliderDragged(displayId: displayId, level: newLevel)
+                                    } else if !isBrightness {
                                         SystemHUDManager.shared.spotifySliderDragged(percent: newLevel * 100)
                                     }
                                 }
