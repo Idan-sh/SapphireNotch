@@ -281,33 +281,6 @@ extension BluetoothBatteryReader {
     }
 
     private nonisolated static func parseSystemProfilerData(_ data: Data) -> [(name: String, level: Int, type: String)] {
-        var results: [(String, Int, String)] = []
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let btData = json["SPBluetoothDataType"] as? [[String: Any]],
-              let first = btData.first,
-              let devices = first["device_connected"] as? [[String: Any]] else {
-            return results
-        }
-
-        for device in devices {
-            guard let name = device["device_name"] as? String,
-                  let minorType = device["device_minorType"] as? String else { continue }
-            let levels: [(String, String?)] = [
-                ("device_batteryLevelLeft", "Left"),
-                ("device_batteryLevelRight", "Right"),
-                ("device_batteryLevelCase", "Case"),
-                ("device_batteryLevelSingle", nil),
-            ]
-            for (key, side) in levels {
-                if let raw = device[key] as? String,
-                   let level = Int(raw.replacingOccurrences(of: "%", with: "")),
-                   level > 0, level <= 100 {
-                    let displayName = side.map { "\(name) (\($0))" } ?? name
-                    results.append((displayName, level, minorType))
-                }
-            }
-        }
-        return results
+        BluetoothBatteryParsing.parseSystemProfilerBatteries(data).map { ($0.name, $0.level, $0.type) }
     }
 }

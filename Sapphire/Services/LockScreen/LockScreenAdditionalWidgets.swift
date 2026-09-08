@@ -338,22 +338,16 @@ struct LockScreenBluetoothMiniWidget: View {
                 .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(device?.name ?? "Bluetooth")
+                Text(BluetoothWidgetPresentation.title(for: device))
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .lineLimit(1)
-                if let level = device?.batteryLevel, device?.eventType == .connected {
-                    Text("\(level)% battery")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("No device connected")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
+                Text(BluetoothWidgetPresentation.subtitle(for: device))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
 
-            if let level = device?.batteryLevel, device?.eventType == .connected {
+            if let level = device?.batteryLevel, device?.eventType != .disconnected {
                 Text("\(level)%")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
             }

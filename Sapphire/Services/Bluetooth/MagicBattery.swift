@@ -274,7 +274,7 @@ class MagicBattery {
                             NotificationCenter.default.post(name: .didUpdateAirPodsBattery, object: nil, userInfo: userInfo)
                         }
 
-                    } else if let battery = device.batteryPercentSingle as? Int, battery > 0 && battery <= 100 {
+                    } else if let battery = device.normalizedBatteryPercent {
                         AirBatteryModel.updateDevice(BatteryDevice(deviceID: address, deviceType: type, deviceName: name, batteryLevel: battery, isCharging: 0, lastUpdate: now))
                     }
                 }
@@ -285,33 +285,31 @@ class MagicBattery {
 
 extension IOBluetoothDevice {
     func getValue(forKey: String) -> Any? {
-        if self.responds(to: Selector((forKey))) {
-            return self.value(forKey: forKey)
-        }
-        return nil
+        guard responds(to: NSSelectorFromString(forKey)) else { return nil }
+        return value(forKey: forKey)
     }
 
     var isAppleDevice: Bool {
-        return self.getValue(forKey: "isAppleDevice") as? Bool ?? false
+        (getValue(forKey: "isAppleDevice") as? Bool) ?? false
     }
 
     var isMultiBatteryDevice: Bool {
-        return self.getValue(forKey: "isMultiBatteryDevice") as? Bool ?? false
+        (getValue(forKey: "isMultiBatteryDevice") as? Bool) ?? false
     }
 
-    var batteryPercentSingle: Int {
-        return self.getValue(forKey: "batteryPercentSingle") as? Int ?? 0
+    var batteryPercentCase: Int { percent(forKey: "batteryPercentCase") ?? 0 }
+    var batteryPercentLeft: Int { percent(forKey: "batteryPercentLeft") ?? 0 }
+    var batteryPercentRight: Int { percent(forKey: "batteryPercentRight") ?? 0 }
+
+    var normalizedBatteryPercent: Int? {
+        if isMultiBatteryDevice {
+            let sides = [percent(forKey: "batteryPercentLeft"), percent(forKey: "batteryPercentRight")].compactMap { $0 }
+            if !sides.isEmpty { return sides.reduce(0, +) / sides.count }
+        }
+        return percent(forKey: "batteryPercentSingle") ?? percent(forKey: "batteryPercentCombined")
     }
 
-    var batteryPercentCase: Int {
-        return self.getValue(forKey: "batteryPercentCase") as? Int ?? 0
-    }
-
-    var batteryPercentLeft: Int {
-        return self.getValue(forKey: "batteryPercentLeft") as? Int ?? 0
-    }
-
-    var batteryPercentRight: Int {
-        return self.getValue(forKey: "batteryPercentRight") as? Int ?? 0
+    private func percent(forKey key: String) -> Int? {
+        BluetoothBatteryParsing.percent(from: getValue(forKey: key))
     }
 }

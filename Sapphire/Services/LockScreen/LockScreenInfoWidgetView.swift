@@ -332,13 +332,19 @@ struct LockScreenInfoWidgetView: View {
     private func BluetoothInfoView() -> some View {
         let device = bluetoothManager.lastEvent
 
-        if let device = device, device.eventType == .connected, let batteryLevel = device.batteryLevel {
+        if let device = device, device.eventType == .connected {
             HStack(spacing: LockScreenConfiguration.infoWidgetGenericHSpacing) {
                 Image(systemName: device.iconName)
                     .font(.system(size: LockScreenConfiguration.infoWidgetIconFontSize))
 
-                Text("\(batteryLevel)%")
-                    .font(.system(size: LockScreenConfiguration.infoWidgetBoldFontSize, weight: .bold, design: .rounded))
+                if let batteryLevel = device.batteryLevel {
+                    Text("\(batteryLevel)%")
+                        .font(.system(size: LockScreenConfiguration.infoWidgetBoldFontSize, weight: .bold, design: .rounded))
+                } else {
+                    Text(device.name)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                }
             }
             .foregroundColor(.white)
             .modifier(TransparentEffect())
