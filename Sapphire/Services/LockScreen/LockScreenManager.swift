@@ -35,6 +35,8 @@ struct LockScreenConfiguration {
     static let infoWidgetMusicArtworkCornerRadius: CGFloat = 10
     static let infoWidgetFocusIconSize: CGFloat = 20
 
+    static let infoWidgetTopInsetFraction: CGFloat = 0.28
+
     // MARK: - Manager Positioning
     static let spacingMainAboveMini: CGFloat = 24
 
@@ -247,7 +249,7 @@ public class LockScreenManager {
         let vis = screen.visibleFrame
         let x = vis.midX - (size.width / 2)
 
-        let topInset = vis.height * 0.23
+        let topInset = vis.height * LockScreenConfiguration.infoWidgetTopInsetFraction
         let y = vis.maxY - topInset - size.height
 
         return NSRect(x: x, y: y, width: size.width, height: size.height)
