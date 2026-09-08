@@ -268,6 +268,9 @@ class DownloadMonitor: ObservableObject {
     private var currentTasks: [URL: DownloadTask] = [:]
     private var taskLastSizes: [URL: Int64] = [:]
     private var taskLastUpdateTimes: [URL: Date] = [:]
+    /// Partial downloads with no byte growth for `stallTimeout` (paused/failed Chrome leftovers).
+    private var stalledURLs: Set<URL> = []
+    private let stallTimeout: TimeInterval = 60
     private var lastPublishedTasks: [DownloadTask] = []
     private var lastPublishedTransferTasks: [FileTransferTask] = []
 
@@ -303,6 +306,7 @@ class DownloadMonitor: ObservableObject {
         currentTasks.removeAll()
         taskLastSizes.removeAll()
         taskLastUpdateTimes.removeAll()
+        stalledURLs.removeAll()
         tasks = []
         lastPublishedTasks = []
         lastPublishedTransferTasks = []
@@ -350,6 +354,9 @@ class DownloadMonitor: ObservableObject {
             for url in knownURLs.subtracting(foundURLs) {
                 print("[DM] Partial download file removed: \(url.lastPathComponent). Removing task.")
                 currentTasks.removeValue(forKey: url)
+                taskLastSizes.removeValue(forKey: url)
+                taskLastUpdateTimes.removeValue(forKey: url)
+                stalledURLs.remove(url)
             }
 
             for url in foundURLs.subtracting(knownURLs) {
@@ -362,6 +369,7 @@ class DownloadMonitor: ObservableObject {
                 )
                 currentTasks[url] = task
                 taskLastUpdateTimes[url] = Date()
+                stalledURLs.remove(url)
             }
 
             if !foundURLs.isEmpty || !knownURLs.isEmpty {
@@ -399,11 +407,15 @@ class DownloadMonitor: ObservableObject {
         guard !currentTasks.isEmpty else { return }
 
         var tasksHaveChanged = false
+        let now = Date()
 
         for (url, var task) in currentTasks {
             guard fileManager.fileExists(atPath: url.path) else {
                 print("[DM] File for task \(task.fileName) no longer exists. Assuming completed or deleted.")
                 currentTasks.removeValue(forKey: url)
+                taskLastSizes.removeValue(forKey: url)
+                taskLastUpdateTimes.removeValue(forKey: url)
+                stalledURLs.remove(url)
                 tasksHaveChanged = true
                 continue
             }
@@ -423,7 +435,6 @@ class DownloadMonitor: ObservableObject {
 
                 let lastSize = taskLastSizes[url] ?? 0
                 let lastUpdateTime = taskLastUpdateTimes[url] ?? task.startTime
-                let now = Date()
                 let timeDiff = now.timeIntervalSince(lastUpdateTime)
 
                 if timeDiff > 0.1 && task.currentBytes > lastSize {
@@ -436,6 +447,12 @@ class DownloadMonitor: ObservableObject {
                     }
                     taskLastSizes[url] = task.currentBytes
                     taskLastUpdateTimes[url] = now
+                    if stalledURLs.remove(url) != nil {
+                        print("[DM] Task \(task.fileName) resumed after stall.")
+                        tasksHaveChanged = true
+                    }
+                } else {
+                    task.downloadSpeed = 0
                 }
 
                 if abs(task.progress - oldProgress) > 0.001 ||
@@ -444,16 +461,28 @@ class DownloadMonitor: ObservableObject {
                 }
                 currentTasks[url] = task
             }
+
+            let idleFor = now.timeIntervalSince(taskLastUpdateTimes[url] ?? task.startTime)
+            if idleFor >= stallTimeout {
+                if stalledURLs.insert(url).inserted {
+                    print("[DM] Task \(task.fileName) stalled after \(Int(idleFor))s with no progress. Hiding from live activity.")
+                    tasksHaveChanged = true
+                }
+            }
         }
 
         let completedTasks = currentTasks.filter { $0.value.progress >= 0.999 }
         for (url, _) in completedTasks {
             print("[DM] Task for \(url.lastPathComponent) is complete. Removing.")
             currentTasks.removeValue(forKey: url)
+            taskLastSizes.removeValue(forKey: url)
+            taskLastUpdateTimes.removeValue(forKey: url)
+            stalledURLs.remove(url)
             tasksHaveChanged = true
         }
 
-        if tasksHaveChanged || tasks.count != currentTasks.count {
+        let publishedCount = currentTasks.keys.filter { !stalledURLs.contains($0) }.count
+        if tasksHaveChanged || tasks.count != publishedCount {
             print("[DM] Download tasks changed. Publishing update.")
             updateTasksList()
         }
@@ -469,7 +498,10 @@ class DownloadMonitor: ObservableObject {
     }
 
     private func updateTasksList() {
-        let updatedTasks = Array(currentTasks.values).sorted { $0.startTime < $1.startTime }
+        let updatedTasks = currentTasks
+            .filter { !stalledURLs.contains($0.key) }
+            .map(\.value)
+            .sorted { $0.startTime < $1.startTime }
         let fileTransferTasks = updatedTasks.map {
             FileTransferTask(
                 fileURL: $0.fileURL,
@@ -478,7 +510,7 @@ class DownloadMonitor: ObservableObject {
                 currentSize: $0.currentBytes,
                 totalSize: $0.totalBytes > 0 ? $0.totalBytes : nil,
                 speed: $0.downloadSpeed ?? 0,
-                lastChangeDate: $0.startTime,
+                lastChangeDate: taskLastUpdateTimes[$0.fileURL] ?? $0.startTime,
                 isComplete: $0.isComplete,
                 sourceType: .browserDownload
             )

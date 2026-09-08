@@ -155,6 +155,7 @@ class LiveActivityManager: ObservableObject {
         .stats,
     ]
     private var dismissedNotifications: [AnyHashable: Date] = [:]
+    private var dismissedFileProgressIDs: [AnyHashable: Date] = [:]
     private var lastIntervalWeatherShowTime: Date?
     private var lastWeatherLiveActivityEnabled: Bool?
     private var lastPersistentWeatherLiveActivityEnabled: Bool?
@@ -635,6 +636,7 @@ class LiveActivityManager: ObservableObject {
         if now.timeIntervalSince(lastSnoozeCleanup) > snoozeCleanupInterval {
             snoozedActivities = snoozedActivities.filter { $0.value > now }
             dismissedNotifications = dismissedNotifications.filter { $0.value > now }
+            dismissedFileProgressIDs = dismissedFileProgressIDs.filter { $0.value > now }
             lastSnoozeCleanup = now
         }
 
@@ -865,6 +867,10 @@ class LiveActivityManager: ObservableObject {
                 dismissedNotifications[id] = Date().addingTimeInterval(300)
             }
             clearNotificationState()
+        case .fileProgress:
+            if let id = self.activityContent.id {
+                dismissedFileProgressIDs[id] = Date().addingTimeInterval(300)
+            }
         default: break
         }
     }
@@ -1501,8 +1507,12 @@ class LiveActivityManager: ObservableObject {
 
     private func checkForFileProgress() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
         guard settingsModel.settings.fileProgressLiveActivityEnabled else { return nil }
+        let now = Date()
         let task = FileDropManager.shared.tasks
             .compactMap { item -> FileTask? in
+                if let until = dismissedFileProgressIDs[item.id], until > now {
+                    return nil
+                }
                 switch item {
                 case .universalTransfer(let task) where !task.isComplete:
                     return .universalTransfer(task)
