@@ -2098,6 +2098,18 @@ enum GeneralSettingType: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
+enum AutoOffMode: String, Codable, CaseIterable, Identifiable, Equatable {
+    case off, duration, time
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .off: "Off"
+        case .duration: "Duration"
+        case .time: "At time"
+        }
+    }
+}
+
 enum NotchButtonType: String, Codable, Identifiable, Equatable {
     case settings, fileShelf, notes, clipboard, intelligence, intelligenceLive, focusSession, caffeine, spacer, multiAudio, battery, pin
     var id: String { self.rawValue }
