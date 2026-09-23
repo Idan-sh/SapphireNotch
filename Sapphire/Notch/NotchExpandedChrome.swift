@@ -460,6 +460,7 @@ struct NotchExpandedChrome: View {
 
     private func togglePanel(_ type: NotchButtonType) {
         openAutoOffPanel = (openAutoOffPanel == type) ? nil : type
+        AutoOffPanelState.shared.isPanelOpen = (openAutoOffPanel != nil)
     }
 
     private func anchorReader(for type: NotchButtonType) -> some View {

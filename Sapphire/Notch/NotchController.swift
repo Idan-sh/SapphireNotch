@@ -42,6 +42,7 @@ struct NotchController: View {
 
     @ObservedObject private var activeAppMonitor = ActiveAppMonitor.shared
     @ObservedObject private var systemHUD = SystemHUDManager.shared
+    @ObservedObject private var autoOffPanelState = AutoOffPanelState.shared
 
     // MARK: - State Properties
     @State private var config: ResolvedNotchConfiguration?
@@ -1832,6 +1833,17 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             width: notchWidth,
             height: notchHeight
         ).integral
+
+        if autoOffPanelState.isPanelOpen {
+            let extra = autoOffPanelState.panelReservedHeight
+            let grown = CGRect(
+                x: frame.origin.x,
+                y: frame.origin.y - extra, // extend downward (screen y grows upward; origin is bottom)
+                width: frame.width,
+                height: frame.height + extra
+            )
+            return grown.insetBy(dx: -1, dy: -1)
+        }
 
         return frame.insetBy(dx: -1, dy: -1)
     }
