@@ -717,6 +717,9 @@ struct SwipeActionSettings: Codable, Equatable {
 
 // MARK: - Main Settings Struct
 struct Settings: Codable, Equatable {
+    static let defaultAutoOffTime: Date =
+        Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()) ?? Date()
+
     var animationProfile: AnimationProfile = .snappy
     var customAnimationConfiguration: CustomizableAnimationConfiguration = .init()
     var widgetSwitchEffect: WidgetSwitchEffect = .smooth
@@ -794,7 +797,7 @@ struct Settings: Codable, Equatable {
     var swipeToHideNotch: Bool = false
     var preventNotchExpandWhenLocked: Bool = false
     var releaseChannel: ReleaseChannel = .stable
-    var notchButtonOrder: [NotchButtonType] = [.settings, .fileShelf, .notes, .clipboard, .intelligence, .focusSession, .spacer, .battery, .multiAudio, .caffeine, .pin]
+    var notchButtonOrder: [NotchButtonType] = [.settings, .fileShelf, .notes, .clipboard, .intelligence, .focusSession, .spacer, .battery, .multiAudio, .caffeine, .keepActive, .pin]
     var circleToSearchEnabled: Bool = true
     var circleToSearchShortcut: KeyboardShortcut = KeyboardShortcut(key: "C", modifiers: [.control, .shift])
     var circleToSearchBrowserEngine: CircleSearchBrowserEngine = .google
@@ -1222,6 +1225,13 @@ struct Settings: Codable, Equatable {
     var sleepInClamshell: Bool = true
     var persistentCaffeinateAfterClamshell: Bool = false
     var caffeinateTimeoutMinutes: Double = 0
+    var caffeinateAutoOffMode: AutoOffMode = .off
+    var caffeinateAutoOffTime: Date = Settings.defaultAutoOffTime
+
+    var keepActiveEnabled: Bool = false
+    var keepActiveAutoOffMode: AutoOffMode = .off
+    var keepActiveTimeoutMinutes: Double = 60
+    var keepActiveAutoOffTime: Date = Settings.defaultAutoOffTime
     var caffeinateTurnOffScreenUsingLidAngle: Bool = false
     var caffeinateLidAngleTrigger: Double = 15.0
     var lidAnglePauseMediaEnabled: Bool = false
@@ -2111,12 +2121,12 @@ enum AutoOffMode: String, Codable, CaseIterable, Identifiable, Equatable {
 }
 
 enum NotchButtonType: String, Codable, Identifiable, Equatable {
-    case settings, fileShelf, notes, clipboard, intelligence, intelligenceLive, focusSession, caffeine, spacer, multiAudio, battery, pin
+    case settings, fileShelf, notes, clipboard, intelligence, intelligenceLive, focusSession, caffeine, keepActive, spacer, multiAudio, battery, pin
     var id: String { self.rawValue }
 
     static let allCases: [NotchButtonType] = [
         .settings, .fileShelf, .notes, .clipboard, .intelligence,
-        .focusSession, .caffeine, .spacer, .multiAudio, .battery, .pin,
+        .focusSession, .caffeine, .keepActive, .spacer, .multiAudio, .battery, .pin,
     ]
 
     var displayName: String {
@@ -2124,7 +2134,7 @@ enum NotchButtonType: String, Codable, Identifiable, Equatable {
         case .settings: "Settings"; case .fileShelf: "File Shelf"; case .notes: "Notes"; case .clipboard: "Clipboard"
         case .intelligence: "Blip"; case .intelligenceLive: "Gemini";
         case .focusSession: "Focus";
-        case .caffeine: "Caffeinate"; case .spacer: "Spacer";
+        case .caffeine: "Caffeinate"; case .keepActive: "Keep Active"; case .spacer: "Spacer";
         case .multiAudio: "Multi-Audio (Beta)"; case .battery: "Battery"; case .pin: "Pin"
         }
     }
@@ -2134,7 +2144,7 @@ enum NotchButtonType: String, Codable, Identifiable, Equatable {
         case .settings: "gearshape"; case .fileShelf: "tray.full"; case .notes: "note.text"; case .clipboard: "list.clipboard"
         case .intelligence: "sparkle"; case .intelligenceLive: "waveform";
         case .focusSession: "moon.fill";
-        case .caffeine: "cup.and.saucer"; case .spacer: "space";
+        case .caffeine: "cup.and.saucer"; case .keepActive: "person.wave.2"; case .spacer: "space";
         case .multiAudio: "hifispeaker.and.homepod.mini.fill"; case .battery: "battery.100"; case .pin: "pin"
         }
     }

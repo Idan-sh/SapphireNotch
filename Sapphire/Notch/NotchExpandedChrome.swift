@@ -406,6 +406,8 @@ struct NotchExpandedChrome: View {
                 )
                 .offset(y: -2)
             }
+        case .keepActive:
+            EmptyView()
         case .battery:
             if settings.settings.batteryEstimatorEnabled {
                 BatteryInfoView(
