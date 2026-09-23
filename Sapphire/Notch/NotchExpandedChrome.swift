@@ -259,6 +259,8 @@ struct NotchExpandedChrome: View {
             if let type = openAutoOffPanel {
                 ZStack(alignment: .topLeading) {
                     Color.black.opacity(0.001)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: config.initialSize.height + AutoOffPanelState.shared.panelReservedHeight)
                         .contentShape(Rectangle())
                         .onTapGesture { closePanel() }
                         .zIndex(99)
@@ -464,8 +466,12 @@ struct NotchExpandedChrome: View {
     }
 
     private func togglePanel(_ type: NotchButtonType) {
-        openAutoOffPanel = (openAutoOffPanel == type) ? nil : type
-        AutoOffPanelState.shared.isPanelOpen = (openAutoOffPanel != nil)
+        if openAutoOffPanel == type {
+            closePanel()
+        } else {
+            openAutoOffPanel = type
+            AutoOffPanelState.shared.isPanelOpen = true
+        }
     }
 
     private func closePanel() {
