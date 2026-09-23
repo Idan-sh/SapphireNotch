@@ -504,6 +504,9 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             .onChange(of: isFileDropTargeted, perform: handleFileDropTargetChange)
             .onChange(of: measuredClickContentSize, perform: handleMeasuredClickSizeChange)
             .onChange(of: measuredAutoContentSize, perform: handleMeasuredAutoSizeChange)
+            .onChange(of: autoOffPanelState.isPanelOpen) { _, _ in
+                refreshNotchInteractionState()
+            }
     }
 
     private func applyNotchNotificationHandlers<V: View>(to view: V) -> some View {
@@ -1836,10 +1839,11 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
 
         if autoOffPanelState.isPanelOpen {
             let extra = autoOffPanelState.panelReservedHeight
+            let width = max(frame.width, 260)
             let grown = CGRect(
-                x: frame.origin.x,
+                x: frame.midX - (width / 2),
                 y: frame.origin.y - extra, // extend downward (screen y grows upward; origin is bottom)
-                width: frame.width,
+                width: width,
                 height: frame.height + extra
             )
             return grown.insetBy(dx: -1, dy: -1)
