@@ -1395,22 +1395,42 @@ struct CaffeineSettingsView: View {
                     Divider().padding(.leading, 20)
 
                     HStack {
-                        Text("Auto-Off Timeout")
+                        Text("Auto-Off")
                         Spacer()
-                        Picker("", selection: $settings.settings.caffeinateTimeoutMinutes) {
-                            Text("Never").tag(0.0)
-                            Text("15 minutes").tag(15.0)
-                            Text("30 minutes").tag(30.0)
-                            Text("1 hour").tag(60.0)
-                            Text("2 hours").tag(120.0)
-                            Text("4 hours").tag(240.0)
+                        Picker("", selection: $settings.settings.caffeinateAutoOffMode) {
+                            ForEach(AutoOffMode.allCases) { Text($0.displayName).tag($0) }
                         }
                         .labelsHidden()
                         .frame(width: 140)
                     }
-                    .padding()
+                    .padding([.horizontal, .top])
 
-                    Text("Automatically turn caffeinate off after the selected duration.")
+                    if settings.settings.caffeinateAutoOffMode == .duration {
+                        HStack {
+                            Text("Duration")
+                            Spacer()
+                            Picker("", selection: $settings.settings.caffeinateTimeoutMinutes) {
+                                Text("15 minutes").tag(15.0)
+                                Text("30 minutes").tag(30.0)
+                                Text("1 hour").tag(60.0)
+                                Text("2 hours").tag(120.0)
+                                Text("4 hours").tag(240.0)
+                            }
+                            .labelsHidden()
+                            .frame(width: 140)
+                        }
+                        .padding([.horizontal])
+                    } else if settings.settings.caffeinateAutoOffMode == .time {
+                        HStack {
+                            Text("Turn off at")
+                            Spacer()
+                            DatePicker("", selection: $settings.settings.caffeinateAutoOffTime, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                        }
+                        .padding([.horizontal])
+                    }
+
+                    Text("Automatically turn caffeinate off after a duration or at a set time. Also configurable by right-clicking the notch icon.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)

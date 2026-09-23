@@ -257,11 +257,16 @@ struct NotchExpandedChrome: View {
         .coordinateSpace(name: "notchIcons")
         .overlay(alignment: .topLeading) {
             if let type = openAutoOffPanel {
-                autoOffPanel(for: type)
-                    .offset(x: (autoOffAnchorX[type] ?? 0) - 120, // center 240-wide panel under icon
-                            y: config.initialSize.height - 2)      // just below the icon row
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .zIndex(100)
+                ZStack(alignment: .topLeading) {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { closePanel() }
+                        .zIndex(99)
+                    autoOffPanel(for: type)
+                        .offset(x: (autoOffAnchorX[type] ?? 0) - 120,
+                                y: config.initialSize.height - 2)
+                        .zIndex(100)
+                }
             }
         }
     }
@@ -461,6 +466,11 @@ struct NotchExpandedChrome: View {
     private func togglePanel(_ type: NotchButtonType) {
         openAutoOffPanel = (openAutoOffPanel == type) ? nil : type
         AutoOffPanelState.shared.isPanelOpen = (openAutoOffPanel != nil)
+    }
+
+    private func closePanel() {
+        openAutoOffPanel = nil
+        AutoOffPanelState.shared.isPanelOpen = false
     }
 
     private func anchorReader(for type: NotchButtonType) -> some View {
