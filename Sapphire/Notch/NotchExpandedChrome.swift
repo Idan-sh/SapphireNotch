@@ -170,6 +170,9 @@ struct NotchExpandedChrome: View {
                 navigationHeader
             }
         }
+        .onDisappear {
+            closePanel()
+        }
     }
 
     @ViewBuilder
@@ -475,6 +478,7 @@ struct NotchExpandedChrome: View {
     }
 
     private func closePanel() {
+        guard openAutoOffPanel != nil || AutoOffPanelState.shared.isPanelOpen else { return }
         openAutoOffPanel = nil
         AutoOffPanelState.shared.isPanelOpen = false
     }

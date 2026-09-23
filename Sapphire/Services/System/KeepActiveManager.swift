@@ -2,7 +2,6 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
-import os.log
 
 @MainActor
 final class KeepActiveManager: ObservableObject {
