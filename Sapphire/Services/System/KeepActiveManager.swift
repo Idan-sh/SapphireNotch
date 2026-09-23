@@ -29,6 +29,21 @@ final class KeepActiveManager: ObservableObject {
                 if !trusted { self?.stop() }
             }
             .store(in: &cancellables)
+
+        struct KeepActiveAutoOffKeys: Equatable {
+            let mode: AutoOffMode
+            let minutes: Double
+            let time: Date
+        }
+        settings.$settings
+            .map { KeepActiveAutoOffKeys(mode: $0.keepActiveAutoOffMode, minutes: $0.keepActiveTimeoutMinutes, time: $0.keepActiveAutoOffTime) }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.isActive else { return }
+                self.scheduleAutoOff()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Pure policy (testable)
@@ -97,7 +112,25 @@ final class KeepActiveManager: ObservableObject {
 
     // MARK: - Auto-off (implemented in Task 4)
 
-    private func scheduleAutoOff() { /* Task 4 */ }
+    private func scheduleAutoOff() {
+        cancelAutoOff()
+        guard isActive else { return }
+        let fireDate = AutoOffScheduler.nextFireDate(
+            mode: settings.settings.keepActiveAutoOffMode,
+            minutes: settings.settings.keepActiveTimeoutMinutes,
+            turnOffAt: settings.settings.keepActiveAutoOffTime
+        )
+        guard let fireDate else { return }
+        timeoutEndsAt = fireDate
+        timeoutTask = Task { @MainActor [weak self] in
+            let seconds = fireDate.timeIntervalSinceNow
+            if seconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            }
+            guard !Task.isCancelled, let self, self.isActive else { return }
+            self.stop()
+        }
+    }
     private func cancelAutoOff() {
         timeoutTask?.cancel()
         timeoutTask = nil
