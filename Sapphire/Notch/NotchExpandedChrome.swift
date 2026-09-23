@@ -438,6 +438,7 @@ struct NotchExpandedChrome: View {
                     action: { keepActiveManager.toggle() },
                     horizontalPadding: 6
                 )
+                .offset(y: -2)
                 .background(anchorReader(for: .keepActive))
                 .onRightClick { togglePanel(.keepActive) }
             }

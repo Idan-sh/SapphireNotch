@@ -1228,7 +1228,7 @@ struct Settings: Codable, Equatable {
     var caffeinateAutoOffMode: AutoOffMode = .off
     var caffeinateAutoOffTime: Date = Settings.defaultAutoOffTime
 
-    var keepActiveEnabled: Bool = false
+    var keepActiveEnabled: Bool = true
     var keepActiveAutoOffMode: AutoOffMode = .off
     var keepActiveTimeoutMinutes: Double = 60
     var keepActiveAutoOffTime: Date = Settings.defaultAutoOffTime
@@ -1697,6 +1697,17 @@ class SettingsModel: ObservableObject {
                 loaded.caffeinateAutoOffMode = .duration
             }
             defaults.set(true, forKey: "caffeinateAutoOffModeMigratedV1")
+        }
+
+        if defaults.object(forKey: "keepActiveIconDefaultOnV1") == nil {
+            loaded.keepActiveEnabled = true
+            loaded.notchButtonOrder.removeAll { $0 == .keepActive }
+            if let caffeineIndex = loaded.notchButtonOrder.firstIndex(of: .caffeine) {
+                loaded.notchButtonOrder.insert(.keepActive, at: loaded.notchButtonOrder.index(after: caffeineIndex))
+            } else {
+                loaded.notchButtonOrder.append(.keepActive)
+            }
+            defaults.set(true, forKey: "keepActiveIconDefaultOnV1")
         }
 
         loaded.disableUnavailablePremiumFeatures()
