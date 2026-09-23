@@ -56,17 +56,28 @@ class CaffeineManager: ObservableObject {
             }
             .store(in: &cancellables)
 
+        struct CaffeineObservedKeys: Equatable {
+            let sleepInClamshell: Bool
+            let persistentAfterClamshell: Bool
+            let turnOffScreenUsingLidAngle: Bool
+            let lidAngleTrigger: Double
+            let timeoutMinutes: Double
+            let autoOffMode: AutoOffMode
+            let autoOffTime: Date
+        }
         settings.$settings
             .map {
-                (
-                    $0.sleepInClamshell,
-                    $0.persistentCaffeinateAfterClamshell,
-                    $0.caffeinateTurnOffScreenUsingLidAngle,
-                    $0.caffeinateLidAngleTrigger,
-                    $0.caffeinateTimeoutMinutes
+                CaffeineObservedKeys(
+                    sleepInClamshell: $0.sleepInClamshell,
+                    persistentAfterClamshell: $0.persistentCaffeinateAfterClamshell,
+                    turnOffScreenUsingLidAngle: $0.caffeinateTurnOffScreenUsingLidAngle,
+                    lidAngleTrigger: $0.caffeinateLidAngleTrigger,
+                    timeoutMinutes: $0.caffeinateTimeoutMinutes,
+                    autoOffMode: $0.caffeinateAutoOffMode,
+                    autoOffTime: $0.caffeinateAutoOffTime
                 )
             }
-            .removeDuplicates { $0 == $1 }
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.updateLidAngleSensorRequirement()
@@ -156,14 +167,20 @@ class CaffeineManager: ObservableObject {
 
     private func scheduleTimeout() {
         cancelTimeout()
-        let minutes = settings.settings.caffeinateTimeoutMinutes
-        guard shouldRemainActive, minutes > 0 else { return }
+        guard shouldRemainActive else { return }
+        let fireDate = AutoOffScheduler.nextFireDate(
+            mode: settings.settings.caffeinateAutoOffMode,
+            minutes: settings.settings.caffeinateTimeoutMinutes,
+            turnOffAt: settings.settings.caffeinateAutoOffTime
+        )
+        guard let fireDate else { return }
 
-        let endsAt = Date().addingTimeInterval(minutes * 60)
-        timeoutEndsAt = endsAt
+        timeoutEndsAt = fireDate
         timeoutTask = Task { @MainActor [weak self] in
-            let nanos = UInt64(max(0, minutes) * 60 * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: nanos)
+            let seconds = fireDate.timeIntervalSinceNow
+            if seconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            }
             guard !Task.isCancelled, let self, self.shouldRemainActive else { return }
             self.stop()
         }

@@ -1692,6 +1692,13 @@ class SettingsModel: ObservableObject {
             defaults.set(true, forKey: "focusDimFeatureRemovedV1")
         }
 
+        if defaults.object(forKey: "caffeinateAutoOffModeMigratedV1") == nil {
+            if loaded.caffeinateTimeoutMinutes > 0 {
+                loaded.caffeinateAutoOffMode = .duration
+            }
+            defaults.set(true, forKey: "caffeinateAutoOffModeMigratedV1")
+        }
+
         loaded.disableUnavailablePremiumFeatures()
         return loaded
     }
