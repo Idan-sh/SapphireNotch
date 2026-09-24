@@ -163,6 +163,13 @@ class CaffeineManager: ObservableObject {
         isActive = false
         updateLidAngleSensorRequirement()
         restoreBrightnessIfNeeded()
+
+        // Clear auto-off so the next session starts clean (Off + default duration/time).
+        var updated = settings.settings
+        updated.caffeinateAutoOffMode = .off
+        updated.caffeinateTimeoutMinutes = 60
+        updated.caffeinateAutoOffTime = Date()
+        settings.settings = updated
     }
 
     private func scheduleTimeout() {
