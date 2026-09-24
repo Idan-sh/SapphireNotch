@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -6,25 +7,13 @@ struct KeepActiveDetailView: View {
     @ObservedObject private var manager = KeepActiveManager.shared
     @ObservedObject private var permissions = PermissionsManager.shared
 
-    private var isAccessibilityTrusted: Bool {
-        permissions.accessibilityStatus == .granted || AccessibilityTrustMonitor.shared.isTrusted
-    }
-
     private var isOnBinding: Binding<Bool> {
         Binding(
             get: { manager.isActive },
             set: { newValue in
-                if newValue {
-                    manager.start()
-                } else {
-                    manager.stop()
-                }
+                if newValue { manager.start() } else { manager.stop() }
             }
         )
-    }
-
-    private var statusText: String {
-        manager.isActive ? "On" : "Off"
     }
 
     var body: some View {
@@ -40,11 +29,11 @@ struct KeepActiveDetailView: View {
             .tint(.accentColor)
             .interactiveCursor(.clickable)
 
-            Text(statusText)
+            Text(manager.isActive ? "On" : "Off")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.55))
 
-            if !isAccessibilityTrusted {
+            if permissions.accessibilityStatus != .granted, !AccessibilityTrustMonitor.shared.isTrusted {
                 accessibilityPrompt
             }
 
@@ -57,6 +46,7 @@ struct KeepActiveDetailView: View {
             )
             .disabled(!manager.isActive)
             .opacity(manager.isActive ? 1 : 0.45)
+            .id(manager.isActive)
 
             Spacer(minLength: 0)
         }
@@ -64,6 +54,8 @@ struct KeepActiveDetailView: View {
         .frame(width: 520, height: 300, alignment: .topLeading)
         .foregroundColor(.white)
         .preferredColorScheme(.dark)
+        .onAppear { (NSApp.delegate as? AppDelegate)?.makeNotchWindowFocusable() }
+        .onDisappear { (NSApp.delegate as? AppDelegate)?.revertNotchWindowFocus() }
     }
 
     private var header: some View {

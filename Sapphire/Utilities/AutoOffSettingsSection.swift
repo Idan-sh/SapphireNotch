@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// In-notch auto-off controls shared by Keep Active and Caffeinate detail screens.
@@ -54,12 +53,6 @@ struct AutoOffSettingsSection: View {
                                 minutesText = displayMinutesText(for: minutes)
                             } else {
                                 commitMinutesText()
-                            }
-                            guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-                            if isFocused {
-                                appDelegate.makeNotchWindowFocusable()
-                            } else {
-                                appDelegate.revertNotchWindowFocus()
                             }
                         }
                         .onChange(of: minutes) { _, newValue in

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -72,12 +73,15 @@ struct CaffeinateDetailView: View {
                 }
                 .disabled(!manager.isActive)
                 .opacity(manager.isActive ? 1 : 0.45)
+                .id(manager.isActive)
             }
             .padding(16)
         }
         .frame(width: 560, height: 360, alignment: .topLeading)
         .foregroundColor(.white)
         .preferredColorScheme(.dark)
+        .onAppear { (NSApp.delegate as? AppDelegate)?.makeNotchWindowFocusable() }
+        .onDisappear { (NSApp.delegate as? AppDelegate)?.revertNotchWindowFocus() }
     }
 
     private var header: some View {
