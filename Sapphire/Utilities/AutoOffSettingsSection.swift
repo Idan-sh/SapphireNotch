@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct AutoOffPanel: View {
+/// In-notch auto-off controls shared by Keep Active and Caffeinate detail screens.
+struct AutoOffSettingsSection: View {
     let title: String
     @Binding var mode: AutoOffMode
     @Binding var minutes: Double
@@ -10,8 +11,8 @@ struct AutoOffPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.85))
 
             Picker("", selection: $mode) {
                 ForEach(AutoOffMode.allCases) { m in
@@ -20,6 +21,7 @@ struct AutoOffPanel: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .interactiveCursor(.clickable)
 
             switch mode {
             case .off:
@@ -27,30 +29,29 @@ struct AutoOffPanel: View {
             case .duration:
                 HStack(spacing: 8) {
                     Slider(value: $minutes, in: 5...480, step: 5)
+                        .interactiveCursor(.clickable)
                     TextField("", value: $minutes, formatter: Self.minutesFormatter)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 52)
-                    Text("min").font(.caption).foregroundColor(.secondary)
+                        .interactiveCursor(.text)
+                    Text("min")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.55))
                 }
             case .time:
                 DatePicker("", selection: $turnOffAt, displayedComponents: .hourAndMinute)
                     .labelsHidden()
+                    .colorScheme(.dark)
+                    .interactiveCursor(.clickable)
             }
 
             if let endsAt, mode != .off {
                 Text("Turns off at \(endsAt, style: .time)")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.55))
             }
         }
-        .padding(12)
-        .frame(width: 240)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.black.opacity(0.85))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.white.opacity(0.12)))
-        )
-        .shadow(radius: 12, y: 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private static let minutesFormatter: NumberFormatter = {

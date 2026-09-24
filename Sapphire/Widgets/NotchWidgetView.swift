@@ -282,6 +282,10 @@ struct NotchWidgetView: View {
             FocusSessionDetailView(navigationStack: navigationStack)
         case .batteryDetailView:
             BatteryDetailView()
+        case .keepActiveDetail:
+            KeepActiveDetailView()
+        case .caffeinateDetail:
+            CaffeinateDetailView()
         }
     }
 

@@ -53,8 +53,6 @@ final class KeepActiveManager: ObservableObject {
 
     // MARK: - Public control
 
-    func toggle() { isActive ? stop() : start() }
-
     func start() {
         guard !isActive else { scheduleAutoOff(); return }
 
@@ -73,6 +71,12 @@ final class KeepActiveManager: ObservableObject {
         isActive = false
         stopTickTimer()
         cancelAutoOff()
+        // Clear auto-off so the next session starts clean (Off + default duration/time).
+        var updated = settings.settings
+        updated.keepActiveAutoOffMode = .off
+        updated.keepActiveTimeoutMinutes = 60
+        updated.keepActiveAutoOffTime = Date()
+        settings.settings = updated
     }
 
     // MARK: - Tick loop

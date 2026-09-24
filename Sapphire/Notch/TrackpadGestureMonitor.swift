@@ -29,6 +29,8 @@ class TrackpadGestureHandler {
     var onSwipe: ((CGFloat, CGFloat) -> Void)?
     var onTwoFingerTap: (() -> Void)?
     var onPinch: ((CGFloat) -> Void)?
+    /// When false, right-clicks are delivered to the notch buttons instead of being treated as a two-finger tap.
+    var consumesRightClickAsGesture = false
 
     private init() {}
 
@@ -97,7 +99,7 @@ class TrackpadGestureHandler {
             }
 
             if event.clickCount == 1 && !event.modifierFlags.contains(.control) {
-                if now - self.lastGestureTime > self.gestureDebounceInterval {
+                if now - self.lastGestureTime > self.gestureDebounceInterval, self.consumesRightClickAsGesture {
                     self.lastGestureTime = now
 
                     DispatchQueue.main.async {

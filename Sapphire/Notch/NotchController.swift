@@ -42,7 +42,6 @@ struct NotchController: View {
 
     @ObservedObject private var activeAppMonitor = ActiveAppMonitor.shared
     @ObservedObject private var systemHUD = SystemHUDManager.shared
-    @ObservedObject private var autoOffPanelState = AutoOffPanelState.shared
 
     // MARK: - State Properties
     @State private var config: ResolvedNotchConfiguration?
@@ -386,6 +385,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
                 to: applyNotchStateHandlers(to: chrome)
             )
         )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -504,9 +504,6 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             .onChange(of: isFileDropTargeted, perform: handleFileDropTargetChange)
             .onChange(of: measuredClickContentSize, perform: handleMeasuredClickSizeChange)
             .onChange(of: measuredAutoContentSize, perform: handleMeasuredAutoSizeChange)
-            .onChange(of: autoOffPanelState.isPanelOpen) { _, _ in
-                refreshNotchInteractionState()
-            }
     }
 
     private func applyNotchNotificationHandlers<V: View>(to view: V) -> some View {
@@ -856,6 +853,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         TrackpadGestureHandler.shared.onTwoFingerTap = {
             self.handleTrackpadTwoFingerTap()
         }
+        updateRightClickConsumption()
 
         if fileDropFlowObserver == nil {
             fileDropFlowObserver = NotificationCenter.default.addObserver(
@@ -882,6 +880,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         TrackpadGestureHandler.shared.stopMonitoring()
         TrackpadGestureHandler.shared.onSwipe = nil
         TrackpadGestureHandler.shared.onTwoFingerTap = nil
+        TrackpadGestureHandler.shared.consumesRightClickAsGesture = false
         HiddenNotchRevealMonitor.shared.stop()
         if let fileDropFlowObserver {
             NotificationCenter.default.removeObserver(fileDropFlowObserver)
@@ -1106,6 +1105,8 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
                 refreshAnimatedSizeForCurrentState()
             }
         }
+
+        updateRightClickConsumption()
 
         if isContentUpdate { return }
 
@@ -1700,6 +1701,11 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         (NSApp.delegate as? AppDelegate)?.makeNotchWindowFocusable()
     }
 
+    private func updateRightClickConsumption() {
+        TrackpadGestureHandler.shared.consumesRightClickAsGesture =
+            notchState == .autoExpanded || notchState == .hoverExpanded
+    }
+
     private func handleTrackpadTwoFingerTap() {
         guard (notchState == .autoExpanded || notchState == .hoverExpanded) else { return }
 
@@ -1837,18 +1843,6 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             height: notchHeight
         ).integral
 
-        if autoOffPanelState.isPanelOpen {
-            let extra = autoOffPanelState.panelReservedHeight
-            let width = max(frame.width, 260)
-            let grown = CGRect(
-                x: frame.midX - (width / 2),
-                y: frame.origin.y - extra, // extend downward (screen y grows upward; origin is bottom)
-                width: width,
-                height: frame.height + extra
-            )
-            return grown.insetBy(dx: -1, dy: -1)
-        }
-
         return frame.insetBy(dx: -1, dy: -1)
     }
 
@@ -1873,7 +1867,8 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
         case .musicApiKeysMissing, .geminiApiKeysMissing, .musicLoginPrompt, .musicLyrics,
                 .musicPlaylistDetail, .musicArtistDetail, .musicAlbumDetail, .snapZones, .fileShelfLanding, .fileActionPreview,
                 .multiAudioDeviceAdjust, .multiAudioAppEQ, .multiAudioEQ, .dragActivated,
-                .agentS, .blipHub, .circleToSearch, .updateAvailable, .focusSessionDetailView, .batteryDetailView:
+                .agentS, .blipHub, .circleToSearch, .updateAvailable, .focusSessionDetailView, .batteryDetailView,
+                .keepActiveDetail, .caffeinateDetail:
             return nil
         }
     }

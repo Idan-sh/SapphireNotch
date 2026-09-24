@@ -1430,7 +1430,7 @@ struct CaffeineSettingsView: View {
                         .padding([.horizontal])
                     }
 
-                    Text("Automatically turn caffeinate off after a duration or at a set time. Also configurable by right-clicking the notch icon.")
+                    Text("Automatically turn caffeinate off after a duration or at a set time. Also configurable from the Caffeinate screen in the notch.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)

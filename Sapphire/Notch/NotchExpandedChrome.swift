@@ -130,8 +130,6 @@ struct NotchExpandedChrome: View {
     @ObservedObject private var microphoneManager = MicrophoneUsageManager.shared
     @StateObject private var caffeineManager = CaffeineManager.shared
     @StateObject private var keepActiveManager = KeepActiveManager.shared
-    @State private var openAutoOffPanel: NotchButtonType? = nil
-    @State private var autoOffAnchorX: [NotchButtonType: CGFloat] = [:]
 
     @State private var isGeminiHovered = false
 
@@ -169,9 +167,6 @@ struct NotchExpandedChrome: View {
             } else if ![.fileShelfLanding, .snapZones, .dragActivated].contains(mode) {
                 navigationHeader
             }
-        }
-        .onDisappear {
-            closePanel()
         }
     }
 
@@ -257,23 +252,6 @@ struct NotchExpandedChrome: View {
         .padding(.horizontal, NotchConfiguration.defaultModeIconsHorizontalPadding)
         .frame(height: config.initialSize.height)
         .frame(width: max(animatedWidth, iconsIntrinsicWidth))
-        .coordinateSpace(name: "notchIcons")
-        .overlay(alignment: .topLeading) {
-            if let type = openAutoOffPanel {
-                ZStack(alignment: .topLeading) {
-                    Color.black.opacity(0.001)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: config.initialSize.height + AutoOffPanelState.shared.panelReservedHeight)
-                        .contentShape(Rectangle())
-                        .onTapGesture { closePanel() }
-                        .zIndex(99)
-                    autoOffPanel(for: type)
-                        .offset(x: (autoOffAnchorX[type] ?? 0) - 120,
-                                y: config.initialSize.height - 2)
-                        .zIndex(100)
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -424,23 +402,19 @@ struct NotchExpandedChrome: View {
             if settings.settings.caffeinateEnabled {
                 SubtleIconButton(
                     systemName: caffeineManager.isActive ? "cup.and.heat.waves.fill" : "cup.and.heat.waves",
-                    action: { caffeineManager.toggle() },
+                    action: { navigationStack.append(.caffeinateDetail) },
                     horizontalPadding: 6
                 )
                 .offset(y: -2)
-                .background(anchorReader(for: .caffeine))
-                .onRightClick { togglePanel(.caffeine) }
             }
         case .keepActive:
             if settings.settings.keepActiveEnabled {
                 SubtleIconButton(
                     systemName: keepActiveManager.isActive ? "person.wave.2.fill" : "person.wave.2",
-                    action: { keepActiveManager.toggle() },
+                    action: { navigationStack.append(.keepActiveDetail) },
                     horizontalPadding: 6
                 )
                 .offset(y: -2)
-                .background(anchorReader(for: .keepActive))
-                .onRightClick { togglePanel(.keepActive) }
             }
         case .battery:
             if settings.settings.batteryEstimatorEnabled {
@@ -465,55 +439,6 @@ struct NotchExpandedChrome: View {
                 }, horizontalPadding: 6)
             }
         case .spacer:
-            EmptyView()
-        }
-    }
-
-    private func togglePanel(_ type: NotchButtonType) {
-        if openAutoOffPanel == type {
-            closePanel()
-        } else {
-            openAutoOffPanel = type
-            AutoOffPanelState.shared.isPanelOpen = true
-        }
-    }
-
-    private func closePanel() {
-        guard openAutoOffPanel != nil || AutoOffPanelState.shared.isPanelOpen else { return }
-        openAutoOffPanel = nil
-        AutoOffPanelState.shared.isPanelOpen = false
-    }
-
-    private func anchorReader(for type: NotchButtonType) -> some View {
-        GeometryReader { geo in
-            Color.clear
-                .onAppear { autoOffAnchorX[type] = geo.frame(in: .named("notchIcons")).midX }
-                .onChange(of: geo.frame(in: .named("notchIcons")).midX) { _, x in
-                    autoOffAnchorX[type] = x
-                }
-        }
-    }
-
-    @ViewBuilder
-    private func autoOffPanel(for type: NotchButtonType) -> some View {
-        switch type {
-        case .keepActive:
-            AutoOffPanel(
-                title: "Keep Active auto-off",
-                mode: $settings.settings.keepActiveAutoOffMode,
-                minutes: $settings.settings.keepActiveTimeoutMinutes,
-                turnOffAt: $settings.settings.keepActiveAutoOffTime,
-                endsAt: keepActiveManager.timeoutEndsAt
-            )
-        case .caffeine:
-            AutoOffPanel(
-                title: "Caffeinate auto-off",
-                mode: $settings.settings.caffeinateAutoOffMode,
-                minutes: $settings.settings.caffeinateTimeoutMinutes,
-                turnOffAt: $settings.settings.caffeinateAutoOffTime,
-                endsAt: caffeineManager.timeoutEndsAt
-            )
-        default:
             EmptyView()
         }
     }
