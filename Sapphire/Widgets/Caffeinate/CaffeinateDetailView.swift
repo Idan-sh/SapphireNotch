@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 @MainActor
@@ -71,17 +70,14 @@ struct CaffeinateDetailView: View {
 
                     lidAngleSection
                 }
-                .disabled(!manager.isActive)
-                .opacity(manager.isActive ? 1 : 0.45)
-                .id(manager.isActive)
+                .featureGated(manager.isActive)
             }
             .padding(16)
         }
         .frame(width: 560, height: 360, alignment: .topLeading)
         .foregroundColor(.white)
         .preferredColorScheme(.dark)
-        .onAppear { (NSApp.delegate as? AppDelegate)?.makeNotchWindowFocusable() }
-        .onDisappear { (NSApp.delegate as? AppDelegate)?.revertNotchWindowFocus() }
+        .notchDetailKeyboardFocus()
     }
 
     private var header: some View {
@@ -152,7 +148,6 @@ struct CaffeinateDetailView: View {
                 .foregroundColor(.white.opacity(0.9))
         }
         .toggleStyle(.switch)
-        .tint(.accentColor)
         .interactiveCursor(.clickable)
     }
 

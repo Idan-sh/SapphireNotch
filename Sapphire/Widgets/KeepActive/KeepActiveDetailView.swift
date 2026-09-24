@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 @MainActor
@@ -44,9 +43,7 @@ struct KeepActiveDetailView: View {
                 turnOffAt: $settings.settings.keepActiveAutoOffTime,
                 endsAt: manager.timeoutEndsAt
             )
-            .disabled(!manager.isActive)
-            .opacity(manager.isActive ? 1 : 0.45)
-            .id(manager.isActive)
+            .featureGated(manager.isActive)
 
             Spacer(minLength: 0)
         }
@@ -54,8 +51,7 @@ struct KeepActiveDetailView: View {
         .frame(width: 520, height: 300, alignment: .topLeading)
         .foregroundColor(.white)
         .preferredColorScheme(.dark)
-        .onAppear { (NSApp.delegate as? AppDelegate)?.makeNotchWindowFocusable() }
-        .onDisappear { (NSApp.delegate as? AppDelegate)?.revertNotchWindowFocus() }
+        .notchDetailKeyboardFocus()
     }
 
     private var header: some View {
