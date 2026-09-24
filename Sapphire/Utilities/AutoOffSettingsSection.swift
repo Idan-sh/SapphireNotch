@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// In-notch auto-off controls shared by Keep Active and Caffeinate detail screens.
@@ -7,6 +8,9 @@ struct AutoOffSettingsSection: View {
     @Binding var minutes: Double
     @Binding var turnOffAt: Date
     let endsAt: Date?
+
+    @FocusState private var minutesFieldFocused: Bool
+    @State private var minutesText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -30,10 +34,42 @@ struct AutoOffSettingsSection: View {
                 HStack(spacing: 8) {
                     Slider(value: $minutes, in: 5...480, step: 5)
                         .interactiveCursor(.clickable)
-                    TextField("", value: $minutes, formatter: Self.minutesFormatter)
+                    TextField("", text: $minutesText)
                         .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
                         .frame(width: 52)
+                        .focused($minutesFieldFocused)
                         .interactiveCursor(.text)
+                        // TextField + NumberFormatter only validates on commit; limit live input here.
+                        .onChange(of: minutesText) { _, newValue in
+                            let limited = String(newValue.filter(\.isNumber).prefix(3))
+                            if minutesText != limited { minutesText = limited }
+                        }
+                        .onSubmit {
+                            commitMinutesText()
+                            minutesFieldFocused = false
+                        }
+                        .onChange(of: minutesFieldFocused) { _, isFocused in
+                            if isFocused {
+                                minutesText = displayMinutesText(for: minutes)
+                            } else {
+                                commitMinutesText()
+                            }
+                            guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
+                            if isFocused {
+                                appDelegate.makeNotchWindowFocusable()
+                            } else {
+                                appDelegate.revertNotchWindowFocus()
+                            }
+                        }
+                        .onChange(of: minutes) { _, newValue in
+                            guard !minutesFieldFocused else { return }
+                            minutesText = displayMinutesText(for: newValue)
+                        }
+                        .onAppear { minutesText = displayMinutesText(for: minutes) }
+                        .onDisappear {
+                            if minutesFieldFocused { minutesFieldFocused = false }
+                        }
                     Text("min")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.55))
@@ -54,12 +90,15 @@ struct AutoOffSettingsSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private static let minutesFormatter: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.minimum = 5
-        f.maximum = 480
-        f.maximumFractionDigits = 0
-        return f
-    }()
+    private func displayMinutesText(for value: Double) -> String {
+        String(Int(value.rounded()))
+    }
+
+    private func commitMinutesText() {
+        let parsed = Double(minutesText) ?? minutes
+        let stepped = (parsed / 5).rounded() * 5
+        let safe = stepped.isNaN || stepped.isInfinite ? 60 : stepped
+        minutes = min(480, max(5, safe))
+        minutesText = displayMinutesText(for: minutes)
+    }
 }
