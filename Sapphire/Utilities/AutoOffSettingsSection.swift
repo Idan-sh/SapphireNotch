@@ -6,10 +6,13 @@ struct AutoOffSettingsSection: View {
     @Binding var mode: AutoOffMode
     @Binding var minutes: Double
     @Binding var turnOffAt: Date
-    let endsAt: Date?
 
     @FocusState private var minutesFieldFocused: Bool
     @State private var minutesText = ""
+
+    private var previewEndsAt: Date? {
+        AutoOffScheduler.nextFireDate(mode: mode, minutes: minutes, turnOffAt: turnOffAt)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -74,8 +77,8 @@ struct AutoOffSettingsSection: View {
                     .interactiveCursor(.clickable)
             }
 
-            if let endsAt, mode != .off {
-                Text("Turns off at \(endsAt, style: .time)")
+            if let previewEndsAt, mode != .off {
+                Text("Turns off at \(previewEndsAt, style: .time)")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.55))
             }

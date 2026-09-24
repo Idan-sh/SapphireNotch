@@ -51,8 +51,7 @@ struct CaffeinateDetailView: View {
                         title: "Auto-off",
                         mode: $settings.settings.caffeinateAutoOffMode,
                         minutes: $settings.settings.caffeinateTimeoutMinutes,
-                        turnOffAt: $settings.settings.caffeinateAutoOffTime,
-                        endsAt: manager.timeoutEndsAt
+                        turnOffAt: $settings.settings.caffeinateAutoOffTime
                     )
 
                     Divider().overlay(Color.white.opacity(0.12))

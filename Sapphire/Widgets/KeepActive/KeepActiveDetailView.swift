@@ -40,8 +40,7 @@ struct KeepActiveDetailView: View {
                 title: "Auto-off",
                 mode: $settings.settings.keepActiveAutoOffMode,
                 minutes: $settings.settings.keepActiveTimeoutMinutes,
-                turnOffAt: $settings.settings.keepActiveAutoOffTime,
-                endsAt: manager.timeoutEndsAt
+                turnOffAt: $settings.settings.keepActiveAutoOffTime
             )
             .featureGated(manager.isActive)
 
