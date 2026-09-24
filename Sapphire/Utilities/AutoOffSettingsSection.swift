@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// In-notch auto-off controls shared by Keep Active and Caffeinate detail screens.
@@ -7,6 +8,7 @@ struct AutoOffSettingsSection: View {
     @Binding var minutes: Double
     @Binding var turnOffAt: Date
 
+    @Environment(\.isEnabled) private var isEnabled
     @FocusState private var minutesFieldFocused: Bool
     @State private var minutesText = ""
 
@@ -36,6 +38,20 @@ struct AutoOffSettingsSection: View {
                 HStack(spacing: 8) {
                     Slider(value: $minutes, in: 5...480, step: 5)
                         .interactiveCursor(.clickable)
+                        .onChange(of: minutes) { oldValue, newValue in
+                            if !minutesFieldFocused {
+                                minutesText = displayMinutesText(for: newValue)
+                            }
+                            guard isEnabled,
+                                  Int(oldValue.rounded()) != Int(newValue.rounded()),
+                                  SettingsModel.shared.settings.hapticFeedbackEnabled
+                            else { return }
+                            // Native Force Touch tick for discrete slider steps.
+                            NSHapticFeedbackManager.defaultPerformer.perform(
+                                .alignment,
+                                performanceTime: .now
+                            )
+                        }
                     TextField("", text: $minutesText)
                         .textFieldStyle(.roundedBorder)
                         .multilineTextAlignment(.trailing)
@@ -57,10 +73,6 @@ struct AutoOffSettingsSection: View {
                             } else {
                                 commitMinutesText()
                             }
-                        }
-                        .onChange(of: minutes) { _, newValue in
-                            guard !minutesFieldFocused else { return }
-                            minutesText = displayMinutesText(for: newValue)
                         }
                         .onAppear { minutesText = displayMinutesText(for: minutes) }
                         .onDisappear {
