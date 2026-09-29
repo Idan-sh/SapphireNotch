@@ -37,6 +37,7 @@ struct NotchController: View {
     // MARK: - State Objects
     @StateObject private var fileShelfState = FileShelfState()
     @StateObject private var dragManager = GlobalDragManager.shared
+    @ObservedObject private var dragSession = DragSession.shared
     @StateObject private var dragState = DragStateManager.shared
     @StateObject private var calendarViewModel: InteractiveCalendarViewModel
 
@@ -237,7 +238,7 @@ struct NotchController: View {
     }
 
     private var isInteractive: Bool {
-        !isManuallyHidden && (notchState == .clickExpanded || isHovered || dragManager.isDraggingInActivationZone || activeAppMonitor.isWindowDragging)
+        !isManuallyHidden && (notchState == .clickExpanded || isHovered || dragManager.isDraggingInActivationZone || dragSession.isWindowDragging)
     }
 
     private var cursorIsOnMyScreen: Bool {
@@ -500,7 +501,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             }
             .onChange(of: navigationStack, handleNavigationStackChange)
             .onChange(of: dragManager.isDraggingInActivationZone, perform: handleDragActivationZoneChange)
-            .onChange(of: activeAppMonitor.isWindowDragging, perform: handleActiveWindowDragChange)
+            .onChange(of: dragSession.isWindowDragging, perform: handleActiveWindowDragChange)
             .onChange(of: isFileDropTargeted, perform: handleFileDropTargetChange)
             .onChange(of: measuredClickContentSize, perform: handleMeasuredClickSizeChange)
             .onChange(of: measuredAutoContentSize, perform: handleMeasuredAutoSizeChange)
@@ -1648,7 +1649,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             || isPinned
             || isHovered
             || dragManager.isDraggingInActivationZone
-            || activeAppMonitor.isWindowDragging
+            || dragSession.isWindowDragging
 
         if hasActivity {
             inactiveHideUserOverride = false
@@ -1799,7 +1800,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             suppressHoverAfterReveal = false
         }
 
-        if isPointerInside != isHovered, !dragManager.isDraggingInActivationZone, !activeAppMonitor.isWindowDragging {
+        if isPointerInside != isHovered, !dragManager.isDraggingInActivationZone, !dragSession.isWindowDragging {
             if !isPointerInside, notchState == .clickExpanded, widgetSwitchProtectionTask != nil {
                 return
             }
@@ -2052,7 +2053,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             ? interactiveBounds
             : interactiveBounds.insetBy(dx: -Self.hoverCollapseMargin, dy: -Self.hoverCollapseMargin)
         guard !hoverBounds.contains(mouseLocation) else { return }
-        guard !dragManager.isDraggingInActivationZone && !activeAppMonitor.isWindowDragging else { return }
+        guard !dragManager.isDraggingInActivationZone && !dragSession.isWindowDragging else { return }
         scheduleCollapse(after: 0)
     }
 
@@ -2064,7 +2065,7 @@ self.notchWidget = NotchWidgetView(calendarViewModel: calendarViewModel)
             do {
                 try await Task.sleep(for: .milliseconds(Int(delay * 1000)))
                 guard !Task.isCancelled else { return }
-                if !self.isHovered && !self.dragManager.isDraggingInActivationZone && !self.activeAppMonitor.isWindowDragging {
+                if !self.isHovered && !self.dragManager.isDraggingInActivationZone && !self.dragSession.isWindowDragging {
                     self.notchState = isLiveActivityActive ? .autoExpanded : .initial
                     self.evaluateInactiveNotchVisibility()
                 }

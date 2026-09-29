@@ -25,29 +25,12 @@ class ActiveAppMonitor: ObservableObject {
     @Published private(set) var activeAppBundleID: String?
     @Published private(set) var isFullScreen: Bool = false
     @Published private(set) var fullScreenDisplayID: CGDirectDisplayID? = nil
-    @Published private(set) var isWindowDragging: Bool = false
 
     private let settingsModel: SettingsModel
     private var cancellables = Set<AnyCancellable>()
 
     private let kAXMainWindowAttribute = "AXMainWindow" as CFString
     private let kAXFullScreenAttribute = "AXFullScreen" as CFString
-
-    private var mouseDragMonitor: Any?
-    private var mouseUpMonitor: Any?
-    private var lastDragCheckTime: TimeInterval = 0
-    private var dragStartWindowOrigins: [CGWindowID: CGPoint] = [:]
-    private var lastWindowDragObservationEnabled: Bool?
-    private let windowDragOriginThreshold: CGFloat = 6
-
-    deinit {
-        if let monitor = mouseDragMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        if let monitor = mouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
 
     private init() {
         self.settingsModel = SettingsModel.shared
@@ -72,14 +55,14 @@ class ActiveAppMonitor: ObservableObject {
                 self.updateLyricPermission()
 
                 let observationEnabled = settings.snapOnWindowDragEnabled || settings.snapDragEnabled
-                guard self.lastWindowDragObservationEnabled != observationEnabled else { return }
-                self.lastWindowDragObservationEnabled = observationEnabled
-                self.setupWindowDragMonitoring()
+                DragSession.shared.setWindowDragObservation(observationEnabled)
             }
             .store(in: &cancellables)
 
         updateActiveAppState()
-        setupWindowDragMonitoring()
+        DragSession.shared.setWindowDragObservation(
+            settingsModel.settings.snapOnWindowDragEnabled || settingsModel.settings.snapDragEnabled
+        )
     }
 
     private func updateActiveAppState() {
@@ -142,113 +125,6 @@ class ActiveAppMonitor: ObservableObject {
         if isLyricsAllowedForActiveApp != newPermissionState {
             isLyricsAllowedForActiveApp = newPermissionState
         }
-    }
-
-    // MARK: - Window Drag Detection
-
-    private func setupWindowDragMonitoring() {
-        teardownWindowDragMonitoring()
-
-        let settings = settingsModel.settings
-        let observationEnabled = settings.snapOnWindowDragEnabled || settings.snapDragEnabled
-        lastWindowDragObservationEnabled = observationEnabled
-        guard observationEnabled else { return }
-
-        mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleMouseDraggedForWindowMove()
-            }
-        }
-
-        mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleMouseUpForWindowMove()
-            }
-        }
-    }
-
-    private func teardownWindowDragMonitoring() {
-        if let monitor = mouseDragMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseDragMonitor = nil
-        }
-        if let monitor = mouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseUpMonitor = nil
-        }
-        dragStartWindowOrigins.removeAll()
-        if isWindowDragging {
-            isWindowDragging = false
-        }
-    }
-
-    private func handleMouseDraggedForWindowMove() {
-        let now = CACurrentMediaTime()
-        if now - lastDragCheckTime < 0.03 { return }
-        lastDragCheckTime = now
-
-        guard NSEvent.pressedMouseButtons == 1 else { return }
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
-              frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier else {
-            return
-        }
-
-        let frames = layerZeroWindowFrames(for: frontmostApp.processIdentifier)
-        guard !frames.isEmpty else { return }
-
-        if dragStartWindowOrigins.isEmpty {
-            for (windowID, frame) in frames {
-                dragStartWindowOrigins[windowID] = frame.origin
-            }
-            return
-        }
-
-        for (windowID, frame) in frames {
-            guard let startOrigin = dragStartWindowOrigins[windowID] else {
-                // New window mid-drag (e.g. tab tear-off); wait until it moves.
-                dragStartWindowOrigins[windowID] = frame.origin
-                continue
-            }
-
-            let dx = abs(frame.origin.x - startOrigin.x)
-            let dy = abs(frame.origin.y - startOrigin.y)
-            if dx >= windowDragOriginThreshold || dy >= windowDragOriginThreshold {
-                isWindowDragging = true
-                return
-            }
-        }
-    }
-
-    private func handleMouseUpForWindowMove() {
-        dragStartWindowOrigins.removeAll()
-        if isWindowDragging {
-            isWindowDragging = false
-        }
-    }
-
-    private func layerZeroWindowFrames(for pid: pid_t) -> [CGWindowID: CGRect] {
-        guard let list = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] else {
-            return [:]
-        }
-
-        var result: [CGWindowID: CGRect] = [:]
-        for info in list {
-            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID == pid else { continue }
-            if let layer = info[kCGWindowLayer as String] as? Int, layer != 0 { continue }
-            guard let windowID = info[kCGWindowNumber as String] as? CGWindowID,
-                  let bounds = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let width = bounds["Width"], let height = bounds["Height"],
-                  width >= 200, height >= 120,
-                  let x = bounds["X"], let y = bounds["Y"] else {
-                continue
-            }
-            result[windowID] = CGRect(x: x, y: y, width: width, height: height)
-        }
-        return result
     }
 
     private func displayID(forFullScreenWindow windowElement: AXUIElement) -> CGDirectDisplayID? {

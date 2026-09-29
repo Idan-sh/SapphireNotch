@@ -15,8 +15,7 @@ class GlobalDragManager: ObservableObject {
 
     @Published private(set) var isDraggingInActivationZone: Bool = false
 
-    private var dragMonitor: Any?
-    private var upMonitor: Any?
+    private var dragEventsToken: UUID?
     private var activationTimer: Timer?
     private var isInsideActivationRect: Bool = false
     private let dragState = DragStateManager.shared
@@ -27,48 +26,37 @@ class GlobalDragManager: ObservableObject {
     private init() {}
 
     func startMonitoring() {
-        guard dragMonitor == nil else { return }
+        guard dragEventsToken == nil else { return }
 
-        dragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] _ in
-            self?.handleDrag()
-        }
+        dragEventsToken = DragSession.shared.addCallbacks(DragSessionCallbacks(
+            onMouseDown: { [weak self] in
+                guard let self, self.isDraggingInActivationZone else { return }
+                self.endDrag()
+            },
+            onMouseDragged: { [weak self] in
+                self?.handleDrag()
+            },
+            onMouseUp: { [weak self] in
+                self?.endDrag()
+            }
+        ))
     }
 
     func stopMonitoring() {
-        if let monitor = dragMonitor {
-            NSEvent.removeMonitor(monitor)
-            dragMonitor = nil
+        if let dragEventsToken {
+            DragSession.shared.removeCallbacks(dragEventsToken)
+            self.dragEventsToken = nil
         }
-        stopMouseUpMonitoring()
 
         activationTimer?.invalidate()
         activationTimer = nil
         isInsideActivationRect = false
     }
 
-    private func startMouseUpMonitoring() {
-        guard upMonitor == nil else { return }
-
-        upMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
-            Task { @MainActor in
-                self?.endDrag()
-            }
-        }
-    }
-
-    private func stopMouseUpMonitoring() {
-        if let monitor = upMonitor {
-            NSEvent.removeMonitor(monitor)
-            upMonitor = nil
-        }
-    }
-
     func endDrag() {
         if isDraggingInActivationZone {
             isDraggingInActivationZone = false
         }
-
-        stopMouseUpMonitoring()
 
         dragState.isDraggingFromShelf = false
         activationTimer?.invalidate()
@@ -135,7 +123,7 @@ class GlobalDragManager: ObservableObject {
         }
 
         // Ignore in-app gestures near the notch (tab reorder, text selection, etc.).
-        guard hasActiveDragSession() else {
+        guard DragSession.shared.hasActiveDragSession else {
             if isInsideActivationRect {
                 isInsideActivationRect = false
                 activationTimer?.invalidate()
@@ -150,41 +138,15 @@ class GlobalDragManager: ObservableObject {
         activationTimer?.invalidate()
         let delay = max(0.05, SettingsModel.shared.settings.snapActivationDelay)
         activationTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            guard self.hasActiveDragSession(),
-                  activationRect.contains(NSEvent.mouseLocation),
-                  !self.isDraggingInActivationZone else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                guard DragSession.shared.hasActiveDragSession,
+                      activationRect.contains(NSEvent.mouseLocation),
+                      !self.isDraggingInActivationZone else { return }
 
-            self.isDraggingInActivationZone = true
-            self.startMouseUpMonitoring()
-        }
-    }
-
-    private func hasActiveDragSession() -> Bool {
-        ActiveAppMonitor.shared.isWindowDragging || hasFileURLDragSession()
-    }
-
-    private func hasFileURLDragSession() -> Bool {
-        let pasteboard = NSPasteboard(name: .drag)
-
-        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [
-            .urlReadingFileURLsOnly: true
-        ]) as? [URL], urls.contains(where: \.isFileURL) {
-            return true
-        }
-
-        if pasteboard.types?.contains(.fileURL) == true {
-            return true
-        }
-
-        for item in pasteboard.pasteboardItems ?? [] {
-            guard let path = item.string(forType: .fileURL) else { continue }
-            let decoded = path.removingPercentEncoding ?? path
-            if decoded.hasPrefix("file:") || decoded.hasPrefix("/") {
-                return true
+                self.isDraggingInActivationZone = true
             }
         }
-
-        return false
     }
+
 }

@@ -7,7 +7,6 @@
 
 import AppKit
 import Combine
-import UniformTypeIdentifiers
 
 struct DraggedFilePreview: Identifiable, Equatable {
     let id: String
@@ -28,31 +27,18 @@ class DragStateManager: ObservableObject {
     @Published private(set) var draggedFilePreviews: [DraggedFilePreview] = []
 
     private var shelfDragItemID: UUID?
-    private var shelfDragLocalMouseUpMonitor: Any?
-    private var shelfDragGlobalMouseUpMonitor: Any?
 
-    private init() {}
+    private init() {
+        DragSession.shared.addCallbacks(DragSessionCallbacks(
+            onMouseUp: { [weak self] in
+                self?.endShelfDragIfNeeded()
+            }
+        ))
+    }
 
     func beginShelfDrag(item: ShelfItem) {
         isDraggingFromShelf = true
         shelfDragItemID = item.id
-        startShelfDragMouseUpMonitor()
-    }
-
-    private func startShelfDragMouseUpMonitor() {
-        guard shelfDragLocalMouseUpMonitor == nil, shelfDragGlobalMouseUpMonitor == nil else { return }
-
-        shelfDragLocalMouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
-            Task { @MainActor in
-                self?.endShelfDragIfNeeded()
-            }
-            return event
-        }
-        shelfDragGlobalMouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] _ in
-            Task { @MainActor in
-                self?.endShelfDragIfNeeded()
-            }
-        }
     }
 
     private func endShelfDragIfNeeded() {
@@ -60,7 +46,6 @@ class DragStateManager: ObservableObject {
         let itemID = shelfDragItemID
         isDraggingFromShelf = false
         shelfDragItemID = nil
-        stopShelfDragMouseUpMonitor()
 
         guard SettingsModel.shared.settings.removeFileFromShelfAfterDrag,
               let itemID,
@@ -70,20 +55,8 @@ class DragStateManager: ObservableObject {
         FileShelfManager.shared.removeFile(item)
     }
 
-    private func stopShelfDragMouseUpMonitor() {
-        if let monitor = shelfDragLocalMouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-            shelfDragLocalMouseUpMonitor = nil
-        }
-        if let monitor = shelfDragGlobalMouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-            shelfDragGlobalMouseUpMonitor = nil
-        }
-    }
-
     func refreshDraggedFilePreviews() {
-        let pasteboard = NSPasteboard(name: .drag)
-        let urls = Self.readFileURLs(from: pasteboard)
+        let urls = DragPasteboard.fileURLs()
         guard !urls.isEmpty else {
             if !draggedFilePreviews.isEmpty {
                 draggedFilePreviews = []
@@ -110,27 +83,4 @@ class DragStateManager: ObservableObject {
         }
     }
 
-    private static func readFileURLs(from pasteboard: NSPasteboard) -> [URL] {
-        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [
-            .urlReadingFileURLsOnly: true
-        ]) as? [URL], !urls.isEmpty {
-            return urls
-        }
-
-        if let items = pasteboard.pasteboardItems {
-            var urls: [URL] = []
-            for item in items {
-                if let path = item.string(forType: .fileURL) {
-                    let decoded = path.removingPercentEncoding ?? path
-                    if let url = URL(string: decoded), url.isFileURL {
-                        urls.append(url)
-                    } else if decoded.hasPrefix("/") {
-                        urls.append(URL(fileURLWithPath: decoded))
-                    }
-                }
-            }
-            if !urls.isEmpty { return urls }
-        }
-        return []
-    }
 }
