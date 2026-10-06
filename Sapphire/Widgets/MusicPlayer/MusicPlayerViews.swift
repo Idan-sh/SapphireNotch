@@ -175,6 +175,34 @@ private struct PlayerProgressRemainingLabel: View {
     }
 }
 
+/// Vertical metrics for the transport controls in the music player.
+///
+/// The current lyric used to be inserted above the play/skip row, and these
+/// insets shrank while a lyric was visible so the buttons would not be pushed
+/// down. The line now lives in a fixed slot under the buttons. Insets and that
+/// slot's height have to ignore whether the song has lyrics, or the controls
+/// jump up as soon as lyrics load.
+enum MusicPlayerTransportLayout {
+    static let lyricSlotHeight: CGFloat = 35
+    private static let controlBottomInset: CGFloat = 4
+    private static let controlTopInsetWithoutAccessories: CGFloat = 8
+
+    static func controlTopPadding(hasAccessoryButtons: Bool, hasDisplayableLyrics: Bool) -> CGFloat {
+        _ = hasDisplayableLyrics
+        return hasAccessoryButtons ? 0 : controlTopInsetWithoutAccessories
+    }
+
+    static func controlBottomPadding(hasDisplayableLyrics: Bool) -> CGFloat {
+        _ = hasDisplayableLyrics
+        return controlBottomInset
+    }
+
+    static func reservedLyricSlotHeight(hasDisplayableLyrics: Bool) -> CGFloat {
+        _ = hasDisplayableLyrics
+        return lyricSlotHeight
+    }
+}
+
 private struct LyricTextView: View {
     @EnvironmentObject var musicManager: MusicManager
     @EnvironmentObject var navigationManager: LockScreenNavigationManager
@@ -213,7 +241,12 @@ private struct LyricTextView: View {
                         .transition(lineTransition)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 35, maxHeight: 35, alignment: .center)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MusicPlayerTransportLayout.lyricSlotHeight,
+                maxHeight: MusicPlayerTransportLayout.lyricSlotHeight,
+                alignment: .center
+            )
             .clipped()
             .animation(.easeInOut(duration: 0.35), value: identity)
             .contentShape(Rectangle())
@@ -647,22 +680,38 @@ struct MusicPlayerView: View {
                         MusicPlayerActionButton(type: primaryButtons.dropFirst().first, size: .primary)
                     }
                     .buttonStyle(.sapphireInteractive()).font(.system(size: 22)).foregroundColor(.primary)
-                    .padding(.top, accessoryButtons.isEmpty && !musicManager.hasDisplayableLyrics ? 8 : 0)
-                    .padding(.bottom, musicManager.hasDisplayableLyrics ? 0 : 4)
+                    .padding(.top, MusicPlayerTransportLayout.controlTopPadding(
+                        hasAccessoryButtons: !accessoryButtons.isEmpty,
+                        hasDisplayableLyrics: musicManager.hasDisplayableLyrics
+                    ))
+                    .padding(.bottom, MusicPlayerTransportLayout.controlBottomPadding(
+                        hasDisplayableLyrics: musicManager.hasDisplayableLyrics
+                    ))
 
                     if !accessoryButtons.isEmpty {
                         HStack(spacing: 25) { ForEach(accessoryButtons) { buttonType in MusicPlayerActionButton(type: buttonType, size: .accessory) } }
                         .frame(maxWidth: .infinity).padding(.top, 4)
                     }
 
-                    if musicManager.hasDisplayableLyrics {
-                        LyricTextView(
-                            navigationStack: $navigationStack,
-                            isLockScreenMode: isLockScreenMode,
-                            onCustomTap: onLyricsTap
-                        )
-                    }
+                    lyricSlot
         }
+    }
+
+    private var lyricSlot: some View {
+        let slotHeight = MusicPlayerTransportLayout.reservedLyricSlotHeight(
+            hasDisplayableLyrics: musicManager.hasDisplayableLyrics
+        )
+        return ZStack {
+            if musicManager.hasDisplayableLyrics {
+                LyricTextView(
+                    navigationStack: $navigationStack,
+                    isLockScreenMode: isLockScreenMode,
+                    onCustomTap: onLyricsTap
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: slotHeight, maxHeight: slotHeight)
+        .clipped()
     }
 
     private func accessoryLongPressHandler(for target: MusicLongPressTarget) -> (() -> Void)? {
