@@ -191,7 +191,6 @@ class FileDropManager: ObservableObject {
     }
 
     func updateBrowserDownloads(_ downloads: [FileTransferTask]) {
-        print("[FDM] Received updateBrowserDownloads with \(downloads.count) tasks from DownloadMonitor.")
         syncUniversalTasks(newTasks: downloads, sourceType: .browserDownload, keepDuration: 30.0)
     }
 
@@ -215,6 +214,8 @@ class FileDropManager: ObservableObject {
             if let index = tasks.firstIndex(where: { $0.id == taskID }) {
                 if case .universalTransfer(var task) = tasks[index], taskDismissalTimers[taskID] == nil {
                     task.isComplete = true
+                    task.status = .finished
+                    task.lastChangeDate = Date()
                     tasks[index] = .universalTransfer(task)
                     scheduleTaskDismissal(for: taskID, after: keepDuration)
                 }

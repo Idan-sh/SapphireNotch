@@ -304,17 +304,20 @@ struct FileProgressLiveActivityView {
 
         switch task {
         case .universalTransfer(let transferTask):
-            progress = transferTask.progress
             fileName = transferTask.fileName
-            if transferTask.sourceType == .finder {
+            if transferTask.isComplete {
+                progress = 1
+                statusText = "Finished"
+            } else if transferTask.sourceType == .finder {
+                progress = transferTask.progress
                 statusText = transferTask.speed > 0 ? formatSpeed(transferTask.speed) : "Copying..."
-            } else if let progress {
-                statusText = "\(Int(progress * 100))% • " + (transferTask.speed > 0 ? formatSpeed(transferTask.speed) : "Downloading...")
+            } else if let fraction = transferTask.progress {
+                progress = fraction
+                statusText = "\(Int(fraction * 100))% • " + (transferTask.speed > 0 ? formatSpeed(transferTask.speed) : "Downloading...")
             } else {
+                progress = nil
                 statusText = transferTask.speed > 0 ? formatSpeed(transferTask.speed) : "Downloading..."
             }
-            print("[LiveActivityView] Rendering Universal Transfer: '\(transferTask.fileName)', Progress: \(progress?.description ?? "nil"), Source: \(transferTask.sourceType)")
-
         case .airDrop(let airDropTask):
             progress = airDropTask.progress
             fileName = airDropTask.fileName
@@ -333,37 +336,40 @@ struct FileProgressLiveActivityView {
             statusText = "Ready"
         }
 
-        return HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
+        return HStack(alignment: .center, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(fileName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .frame(height: 13, alignment: .leading)
 
                 Text(statusText)
-                    .font(.system(size: 11))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
                     .lineLimit(1)
+                    .frame(height: 11, alignment: .leading)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            if let progressValue = progress {
-                if progressValue >= 1.0 {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            Group {
+                if let progressValue = progress {
+                    if progressValue >= 1.0 {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.green)
+                    } else {
+                        FileCircularProgressIndicator(progress: progressValue, size: 12, lineWidth: 2.0)
+                    }
                 } else {
-                    FileCircularProgressIndicator(progress: progressValue, size: 12, lineWidth: 3.0)
-                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    NotchIndeterminateSpinner()
                 }
-            } else {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .frame(width: 18, height: 18)
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
+            .frame(maxHeight: .infinity, alignment: .center)
+            .padding(.trailing, 10)
         }
+        .frame(maxHeight: .infinity, alignment: .center)
     }
 
     private static func formatSpeed(_ bytesPerSecond: Double) -> String {
@@ -457,6 +463,20 @@ struct BlipStepProgressRing: View {
             }
         }
         .frame(width: size, height: size)
+    }
+}
+
+struct NotchIndeterminateSpinner: View {
+    @State private var spinning = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.12, to: 0.78)
+            .stroke(Color.white, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .frame(width: 12, height: 12)
+            .rotationEffect(.degrees(spinning ? 360 : 0))
+            .animation(.linear(duration: 0.7).repeatForever(autoreverses: false), value: spinning)
+            .onAppear { spinning = true }
     }
 }
 

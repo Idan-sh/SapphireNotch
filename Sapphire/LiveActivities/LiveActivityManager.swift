@@ -322,10 +322,8 @@ class LiveActivityManager: ObservableObject {
                 scheduler: RunLoop.main,
                 latest: true
             )
-            .sink {
-                [weak self] _ in if self?.currentActivity == .fileProgress || self?.currentActivity == .none {
-                    self?.evaluateAndDisplayActivity()
-                }
+            .sink { [weak self] _ in
+                self?.evaluateAndDisplayActivity()
             }
             .store(in: &cancellables)
 
@@ -1505,6 +1503,8 @@ class LiveActivityManager: ObservableObject {
         )
     }
 
+    private static let finishedFileProgressVisibleInterval: TimeInterval = 4
+
     private func checkForFileProgress() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
         guard settingsModel.settings.fileProgressLiveActivityEnabled else { return nil }
         let now = Date()
@@ -1514,7 +1514,10 @@ class LiveActivityManager: ObservableObject {
                     return nil
                 }
                 switch item {
-                case .universalTransfer(let task) where !task.isComplete:
+                case .universalTransfer(let task):
+                    if task.isComplete, now.timeIntervalSince(task.lastChangeDate) > Self.finishedFileProgressVisibleInterval {
+                        return nil
+                    }
                     return .universalTransfer(task)
                 case .airDrop(let task) where !task.isComplete:
                     return .airDrop(task)
@@ -1535,10 +1538,14 @@ class LiveActivityManager: ObservableObject {
             }
             .first
         guard let task else { return nil }
+        let finishedRemaining: TimeInterval? = {
+            guard case .universalTransfer(let transfer) = task, transfer.isComplete else { return nil }
+            return max(0.8, Self.finishedFileProgressVisibleInterval - now.timeIntervalSince(transfer.lastChangeDate))
+        }()
         return (
             .fileProgress,
             .standard(data: .fileProgress(task: task), id: task.id),
-            nil
+            finishedRemaining
         )
     }
 

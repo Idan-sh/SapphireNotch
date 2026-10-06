@@ -13,20 +13,18 @@ import SQLite3
 struct DownloadTask: Identifiable, Equatable {
     var id: URL { fileURL }
     let fileURL: URL
-    let fileName: String
+    var fileName: String
     var progress: Double = 0.0
     var isComplete: Bool = false
     var totalBytes: Int64 = 0
-
-    var progressFraction: Double? {
-        totalBytes > 0 ? min(1.0, Double(currentBytes) / Double(totalBytes)) : nil
-    }
     var currentBytes: Int64 = 0
     var startTime: Date = Date()
     var estimatedTimeRemaining: TimeInterval?
     var downloadSpeed: Double?
     var source: DownloadSource = .browser
     var status: String = "Downloading..."
+    /// Finished files stay in Downloads, so the notch keeps them only until this time.
+    var autoDismissAt: Date? = nil
 }
 
 enum DownloadSource {
@@ -57,10 +55,14 @@ class DownloadProgressExtractor {
         var currentBytes: Int64
         var totalBytes: Int64?
         var progress: Double?
+        var displayFileName: String?
+        var isFinished: Bool
 
-        init(currentBytes: Int64, totalBytes: Int64? = nil) {
+        init(currentBytes: Int64, totalBytes: Int64? = nil, displayFileName: String? = nil, isFinished: Bool = false) {
             self.currentBytes = currentBytes
             self.totalBytes = totalBytes
+            self.displayFileName = displayFileName
+            self.isFinished = isFinished
 
             if let total = totalBytes, total > 0 {
                 self.progress = min(1.0, Double(currentBytes) / Double(total))
@@ -71,18 +73,15 @@ class DownloadProgressExtractor {
     }
 
     @MainActor static func extractProgress(for url: URL) -> ProgressInfo? {
-        print("[DPE] Attempting to extract progress for: \(url.lastPathComponent)")
 
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             guard let fileSize = attributes[.size] as? Int64 else {
-                print("[DPE] Could not get file size for \(url.lastPathComponent).")
                 return nil
             }
 
             var progressInfo = ProgressInfo(currentBytes: fileSize)
             let downloadType = DownloadMonitor.determineDownloadType(from: url)
-            print("[DPE] Determined download type: \(downloadType)")
 
             switch downloadType {
             case .safari:
@@ -98,18 +97,12 @@ class DownloadProgressExtractor {
                     progressInfo = firefoxInfo
                 }
             case .generic:
-                print("[DPE] Generic file type, no specific progress extraction method.")
+                break
             }
 
-            if progressInfo.totalBytes == nil {
-                print("[DPE] WARNING: Could not determine total size for \(url.lastPathComponent). Progress will be indeterminate.")
-            }
-
-            print("[DPE] Extraction result for \(url.lastPathComponent): current=\(progressInfo.currentBytes), total=\(progressInfo.totalBytes?.description ?? "N/A"), progress=\(progressInfo.progress?.description ?? "N/A")")
             return progressInfo
 
         } catch {
-            print("[DPE] ERROR getting file attributes for \(url.lastPathComponent): \(error)")
             return nil
         }
     }
@@ -117,12 +110,10 @@ class DownloadProgressExtractor {
     private static func extractSafariProgress(for url: URL) -> ProgressInfo? {
         let infoURL = url.appendingPathComponent("Info.plist")
         guard let data = try? Data(contentsOf: infoURL) else {
-            print("[DPE-Safari] Could not read Info.plist at \(infoURL.path)")
             return nil
         }
 
         guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
-            print("[DPE-Safari] Could not serialize Info.plist.")
             return nil
         }
 
@@ -130,11 +121,9 @@ class DownloadProgressExtractor {
         if let bytesSoFar = integerValue(entry["DownloadEntryProgressBytesSoFar"]),
            let bytesTotal = integerValue(entry["DownloadEntryProgressTotalToLoad"] ?? entry["DownloadEntryTotalBytes"]),
            bytesTotal > 0 {
-            print("[DPE-Safari] Found progress in 'DownloadEntry' dictionary.")
             return ProgressInfo(currentBytes: bytesSoFar, totalBytes: bytesTotal)
         }
 
-        print("[DPE-Safari] WARNING: Could not find expected progress keys in Info.plist.")
         return nil
     }
 
@@ -150,8 +139,14 @@ class DownloadProgressExtractor {
     }
 
     private static func extractChromeProgress(for url: URL, currentSize: Int64) -> ProgressInfo? {
-        if let totalBytes = ChromiumDownloadDatabase.totalBytes(for: url) {
-            return ProgressInfo(currentBytes: currentSize, totalBytes: totalBytes)
+        if let snapshot = ChromiumDownloadDatabase.snapshot(for: url) {
+            let total = snapshot.totalBytes > 0 ? snapshot.totalBytes : nil
+            return ProgressInfo(
+                currentBytes: currentSize,
+                totalBytes: total,
+                displayFileName: DownloadFileName.displayName(forPartialURL: url, targetPath: snapshot.targetPath),
+                isFinished: snapshot.isComplete
+            )
         }
 
         let attributeName = "com.apple.metadata:kMDItemTotalBytes"
@@ -162,10 +157,8 @@ class DownloadProgressExtractor {
         }
 
         if attrResult > 0 && totalSize > 0 {
-            print("[DPE-Chrome] Successfully found total size (\(totalSize)) in extended attribute '\(attributeName)'.")
             return ProgressInfo(currentBytes: currentSize, totalBytes: totalSize)
         } else {
-            print("[DPE-Chrome] Could not find total size in extended attributes. Will rely on current size only.")
             return nil
         }
     }
@@ -179,12 +172,191 @@ class DownloadProgressExtractor {
         }
 
         if attrResult > 0 && totalSize > 0 {
-            print("[DPE-Firefox] Successfully found total size (\(totalSize)) in extended attribute '\(attributeName)'.")
             return ProgressInfo(currentBytes: currentSize, totalBytes: totalSize)
         } else {
-            print("[DPE-Firefox] Could not find total size in extended attributes. Will rely on current size only.")
             return nil
         }
+    }
+}
+
+enum DownloadMonitorPublishPolicy {
+    /// Publish when the set of partial files changes, including when the last one disappears.
+    static func shouldPublish(activeFileURLs: Set<URL>, publishedFileURLs: Set<URL>, progressChanged: Bool) -> Bool {
+        if activeFileURLs != publishedFileURLs { return true }
+        return progressChanged
+    }
+}
+
+enum DownloadFileName {
+    static func displayName(forPartialURL url: URL, targetPath: String?) -> String {
+        let fallback = strippedPartialName(url)
+        guard let targetPath, !targetPath.isEmpty else { return fallback }
+        let targetURL = URL(fileURLWithPath: targetPath)
+        let targetName = targetURL.lastPathComponent
+        let targetBase = strippedPartialName(targetURL)
+        guard isUnconfirmedPlaceholder(fallback), !isUnconfirmedPlaceholder(targetBase), !targetName.isEmpty else {
+            return fallback
+        }
+        if ["crdownload", "part", "download"].contains(targetURL.pathExtension.lowercased()) {
+            return targetBase
+        }
+        return targetName
+    }
+
+    static func isUnconfirmedPlaceholder(_ name: String) -> Bool {
+        let parts = name.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return false }
+        return parts[0].caseInsensitiveCompare("Unconfirmed") == .orderedSame && parts[1].allSatisfy(\.isNumber) && !parts[1].isEmpty
+    }
+
+    private static func strippedPartialName(_ url: URL) -> String {
+        let fileNameWithExt = url.lastPathComponent
+        guard !url.pathExtension.isEmpty else { return fileNameWithExt }
+        let ext = "." + url.pathExtension
+        guard let range = fileNameWithExt.range(of: ext, options: [.caseInsensitive, .backwards]) else {
+            return fileNameWithExt
+        }
+        return String(fileNameWithExt[..<range.lowerBound])
+    }
+}
+
+struct ChromiumDownloadSnapshot: Equatable {
+    var totalBytes: Int64
+    var targetPath: String?
+    var targetFileName: String?
+    var isComplete: Bool
+}
+
+enum ChromiumHistoryDatabase {
+    /// Chrome keeps History locked while it is open. A normal read-only open
+    /// returns SQLITE_BUSY, so the notch never learns the file size or the real
+    /// name and stays on an indeterminate spinner.
+    static func readOnlyURI(forDatabasePath path: String) -> String {
+        URL(fileURLWithPath: path).absoluteString + "?immutable=1"
+    }
+
+    static func snapshot(inDatabaseAt databasePath: String, partialURL: URL) -> ChromiumDownloadSnapshot? {
+        let uri = readOnlyURI(forDatabasePath: databasePath)
+        var database: OpaquePointer?
+        let openResult = sqlite3_open_v2(uri, &database, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil)
+        guard openResult == SQLITE_OK else {
+            sqlite3_close(database)
+            return nil
+        }
+        defer { sqlite3_close(database) }
+
+        let partialPath = partialURL.path
+        let basePath = partialURL.deletingPathExtension().path
+
+        // Exact paths only. A LIKE on the final filename also matches an older
+        // completed download of the same name, which marked the new partial finished
+        // and removed it before the notch published it.
+        let query = """
+            SELECT total_bytes, target_path, state FROM downloads
+            WHERE current_path = ?
+               OR (state = 0 AND (target_path = ? OR target_path = ? OR current_path = ?))
+            ORDER BY start_time DESC LIMIT 1
+            """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(statement) }
+
+        let bindValues = [partialPath, partialPath, basePath, basePath]
+        var index = 1
+        for value in bindValues {
+            value.withCString { path in
+                sqlite3_bind_text(statement, Int32(index), path, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
+            index += 1
+        }
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return nil
+        }
+        let totalBytes = sqlite3_column_int64(statement, 0)
+        let targetPath: String? = {
+            guard let bytes = sqlite3_column_text(statement, 1) else { return nil }
+            let value = String(cString: bytes)
+            return value.isEmpty ? nil : value
+        }()
+        let state = sqlite3_column_int(statement, 2)
+        let targetFileName = targetPath.map { URL(fileURLWithPath: $0).lastPathComponent }
+        return ChromiumDownloadSnapshot(
+            totalBytes: totalBytes,
+            targetPath: targetPath,
+            targetFileName: targetFileName,
+            isComplete: state == 1
+        )
+    }
+
+    static func recentDownloads(inDatabaseAt databasePath: String, since: Date) -> [TrackedBrowserDownload] {
+        let uri = readOnlyURI(forDatabasePath: databasePath)
+        var database: OpaquePointer?
+        let openResult = sqlite3_open_v2(uri, &database, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil)
+        guard openResult == SQLITE_OK else {
+            sqlite3_close(database)
+            return []
+        }
+        defer { sqlite3_close(database) }
+
+        let query = """
+            SELECT current_path, target_path, received_bytes, total_bytes, state, end_time
+            FROM downloads
+            WHERE state = 0 OR (state = 1 AND end_time >= ?)
+            ORDER BY start_time DESC LIMIT 40
+            """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_int64(statement, 1, BrowserDownloadLocator.chromeTimestamp(for: since))
+
+        var rows: [TrackedBrowserDownload] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            rows.append(TrackedBrowserDownload(
+                currentPath: columnText(statement, 0),
+                targetPath: columnText(statement, 1),
+                receivedBytes: sqlite3_column_int64(statement, 2),
+                totalBytes: sqlite3_column_int64(statement, 3),
+                state: Int(sqlite3_column_int(statement, 4)),
+                endTime: sqlite3_column_int64(statement, 5)
+            ))
+        }
+        return rows
+    }
+
+    private static func columnText(_ statement: OpaquePointer?, _ index: Int32) -> String {
+        guard let bytes = sqlite3_column_text(statement, index) else { return "" }
+        return String(cString: bytes)
+    }
+}
+
+struct TrackedBrowserDownload: Equatable {
+    var currentPath: String
+    var targetPath: String
+    var receivedBytes: Int64
+    var totalBytes: Int64
+    var state: Int
+    var endTime: Int64
+}
+
+enum BrowserDownloadLocator {
+    /// How long after Chrome finishes a download we still attach the notch to the file it left behind.
+    static let finishedFileMatchWindow: TimeInterval = 30
+    static let finishedFileDisplayDuration: TimeInterval = 6
+
+    static func chromeTimestamp(for date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 + 11_644_473_600) * 1_000_000)
+    }
+
+    static func matchesVisibleFile(_ filePath: String, download: TrackedBrowserDownload, now: Date) -> Bool {
+        guard !filePath.isEmpty else { return false }
+        let pathMatches = filePath == download.currentPath || filePath == download.targetPath
+        guard pathMatches else { return false }
+        if download.state == 0 { return true }
+        guard download.state == 1, download.endTime > 0 else { return false }
+        let endedAt = Date(timeIntervalSince1970: Double(download.endTime) / 1_000_000 - 11_644_473_600)
+        return now.timeIntervalSince(endedAt) <= finishedFileMatchWindow && now >= endedAt
     }
 }
 
@@ -196,60 +368,27 @@ private enum ChromiumDownloadDatabase {
         "Arc/User Data/Default/History"
     ]
 
-    static func totalBytes(for partialURL: URL) -> Int64? {
-        let fullPath = partialURL.path
-        let basePath = partialURL.deletingPathExtension().path
-        let fullName = partialURL.lastPathComponent
-        let baseName = partialURL.deletingPathExtension().lastPathComponent
-        let likeFull = "%/" + fullName
-        let likeBase = "%/" + baseName
-
+    static func snapshot(for partialURL: URL) -> ChromiumDownloadSnapshot? {
         let home = FileManager.default.homeDirectoryForCurrentUser
 
         for relativePath in databasePaths {
             let databaseURL = home.appendingPathComponent("Library/Application Support").appendingPathComponent(relativePath)
             guard FileManager.default.fileExists(atPath: databaseURL.path) else { continue }
-
-            var database: OpaquePointer?
-            guard sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else {
-                sqlite3_close(database)
-                continue
-            }
-            defer { sqlite3_close(database) }
-
-            let query = """
-                SELECT total_bytes FROM downloads
-                WHERE target_path IN (?, ?, ?, ?)
-                   OR current_path IN (?, ?, ?, ?)
-                   OR target_path LIKE ? OR target_path LIKE ?
-                   OR current_path LIKE ? OR current_path LIKE ?
-                ORDER BY start_time DESC LIMIT 1
-                """
-            var statement: OpaquePointer?
-            guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else { continue }
-            defer { sqlite3_finalize(statement) }
-
-            let bindValues = [
-                fullPath, basePath, fullName, baseName,
-                fullPath, basePath, fullName, baseName,
-                likeBase, likeBase, likeFull, likeFull
-            ]
-            var index = 1
-            for value in bindValues {
-                value.withCString { path in
-                    sqlite3_bind_text(statement, Int32(index), path, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                }
-                index += 1
-            }
-
-            guard sqlite3_step(statement) == SQLITE_ROW else { continue }
-            let totalBytes = sqlite3_column_int64(statement, 0)
-            if totalBytes > 0 {
-                print("[DPE-BrowserDB] Found total size (\(totalBytes)) for '\(partialURL.lastPathComponent)' in \(databaseURL.path).")
-                return totalBytes
-            }
+            guard let snapshot = ChromiumHistoryDatabase.snapshot(inDatabaseAt: databaseURL.path, partialURL: partialURL) else { continue }
+            return snapshot
         }
         return nil
+    }
+
+    static func recentDownloads(since: Date) -> [TrackedBrowserDownload] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        var rows: [TrackedBrowserDownload] = []
+        for relativePath in databasePaths {
+            let databaseURL = home.appendingPathComponent("Library/Application Support").appendingPathComponent(relativePath)
+            guard FileManager.default.fileExists(atPath: databaseURL.path) else { continue }
+            rows.append(contentsOf: ChromiumHistoryDatabase.recentDownloads(inDatabaseAt: databaseURL.path, since: since))
+        }
+        return rows
     }
 }
 
@@ -270,6 +409,8 @@ class DownloadMonitor: ObservableObject {
     private var taskLastUpdateTimes: [URL: Date] = [:]
     /// Partial downloads with no byte growth for `stallTimeout` (paused/failed Chrome leftovers).
     private var stalledURLs: Set<URL> = []
+    /// Completed files already shown, keyed so a later rewrite of the same path can show again.
+    private var retiredFinishedSignatures: Set<String> = []
     private let stallTimeout: TimeInterval = 60
     private var lastPublishedTasks: [DownloadTask] = []
     private var lastPublishedTransferTasks: [FileTransferTask] = []
@@ -282,10 +423,8 @@ class DownloadMonitor: ObservableObject {
         guard updateTimer == nil, fileWatcher == nil,
               let downloadDirectory = downloadDirectory,
               fileManager.fileExists(atPath: downloadDirectory.path) else {
-            print("[DM] ERROR: Could not get downloads directory URL.")
             return
         }
-        print("[DM] Starting monitoring on directory: \(downloadDirectory.path)")
 
         updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkDownloads()
@@ -298,7 +437,6 @@ class DownloadMonitor: ObservableObject {
     }
 
     func stopMonitoring() {
-        print("[DM] Stopping monitoring.")
         updateTimer?.invalidate()
         updateTimer = nil
         fileWatcher?.cancel()
@@ -307,6 +445,7 @@ class DownloadMonitor: ObservableObject {
         taskLastSizes.removeAll()
         taskLastUpdateTimes.removeAll()
         stalledURLs.removeAll()
+        retiredFinishedSignatures.removeAll()
         tasks = []
         lastPublishedTasks = []
         lastPublishedTransferTasks = []
@@ -317,14 +456,12 @@ class DownloadMonitor: ObservableObject {
     private func setupDirectoryMonitoring(for directory: URL) {
         let fileDescriptor = open(directory.path, O_EVTONLY)
         guard fileDescriptor >= 0 else {
-            print("[DM] ERROR: Could not open directory for monitoring: \(directory.path)")
             return
         }
 
         fileWatcher = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: .write, queue: queue)
         fileWatcher?.setEventHandler { [weak self] in
             Task { @MainActor in
-                print("[DM] File system event detected. Scanning downloads directory.")
                 self?.scanDownloadsDirectory()
             }
         }
@@ -343,16 +480,25 @@ class DownloadMonitor: ObservableObject {
                 options: .skipsHiddenFiles
             )
             let partialDownloads = contents.filter { url in
-                let ext = url.pathExtension.lowercased()
-                return ext == "crdownload" || ext == "part" ||
-                    (ext == "download" && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true)
+                self.isPartialDownload(url)
+            }
+            let partialSet = Set(partialDownloads)
+            let recentRows = ChromiumDownloadDatabase.recentDownloads(since: Date().addingTimeInterval(-BrowserDownloadLocator.finishedFileMatchWindow))
+            let now = Date()
+            let finishedDownloads = contents.filter { url in
+                guard !partialSet.contains(url), !self.isPartialDownload(url) else { return false }
+                guard let signature = self.finishedFileSignature(for: url),
+                      !self.retiredFinishedSignatures.contains(signature) else { return false }
+                return recentRows.contains { BrowserDownloadLocator.matchesVisibleFile(url.path, download: $0, now: now) }
+            }
+            let trackedFinished = currentTasks.keys.filter { url in
+                currentTasks[url]?.autoDismissAt != nil && fileManager.fileExists(atPath: url.path)
             }
 
-            let foundURLs = Set(partialDownloads)
+            let foundURLs = partialSet.union(finishedDownloads).union(trackedFinished)
             let knownURLs = Set(currentTasks.keys)
 
             for url in knownURLs.subtracting(foundURLs) {
-                print("[DM] Partial download file removed: \(url.lastPathComponent). Removing task.")
                 currentTasks.removeValue(forKey: url)
                 taskLastSizes.removeValue(forKey: url)
                 taskLastUpdateTimes.removeValue(forKey: url)
@@ -360,13 +506,22 @@ class DownloadMonitor: ObservableObject {
             }
 
             for url in foundURLs.subtracting(knownURLs) {
-                print("[DM] New partial download detected: \(url.lastPathComponent). Creating task.")
-                let fileName = getOriginalFileName(from: url)
-                let task = DownloadTask(
+                var task = DownloadTask(
                     fileURL: url,
-                    fileName: fileName,
+                    fileName: partialSet.contains(url) ? getOriginalFileName(from: url) : url.lastPathComponent,
                     startTime: Date()
                 )
+                if let row = recentRows.first(where: { BrowserDownloadLocator.matchesVisibleFile(url.path, download: $0, now: now) }),
+                   !partialSet.contains(url) {
+                    let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init) ?? 0
+                    let total = row.totalBytes > 0 ? row.totalBytes : fileSize
+                    task.totalBytes = total
+                    task.currentBytes = row.state == 1 ? total : max(row.receivedBytes, 0)
+                    task.progress = total > 0 ? min(1, Double(task.currentBytes) / Double(total)) : 1
+                    if row.state == 1 {
+                        task.autoDismissAt = now.addingTimeInterval(BrowserDownloadLocator.finishedFileDisplayDuration)
+                    }
+                }
                 currentTasks[url] = task
                 taskLastUpdateTimes[url] = Date()
                 stalledURLs.remove(url)
@@ -377,7 +532,6 @@ class DownloadMonitor: ObservableObject {
             }
 
         } catch {
-            print("[DM] ERROR scanning downloads directory: \(error)")
         }
     }
 
@@ -395,23 +549,43 @@ class DownloadMonitor: ObservableObject {
             }
         }
 
-        let fileNameWithExt = url.lastPathComponent
-        let ext = "." + url.pathExtension
-        if let range = fileNameWithExt.range(of: ext, options: [.caseInsensitive, .backwards]) {
-            return String(fileNameWithExt[..<range.lowerBound])
-        }
-        return fileNameWithExt
+        return DownloadFileName.displayName(forPartialURL: url, targetPath: nil)
+    }
+
+    private func isPartialDownload(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext == "crdownload" || ext == "part" ||
+            (ext == "download" && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true)
+    }
+
+    private func finishedFileSignature(for url: URL) -> String? {
+        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+              let modified = values.contentModificationDate,
+              let size = values.fileSize else { return nil }
+        return "\(url.path)|\(modified.timeIntervalSince1970)|\(size)"
     }
 
     private func checkDownloads() {
-        guard !currentTasks.isEmpty else { return }
-
         var tasksHaveChanged = false
         let now = Date()
 
+        let expired = currentTasks.compactMap { url, task -> URL? in
+            guard let dismissAt = task.autoDismissAt, now >= dismissAt else { return nil }
+            return url
+        }
+        for url in expired {
+            if let signature = finishedFileSignature(for: url) {
+                retiredFinishedSignatures.insert(signature)
+            }
+            currentTasks.removeValue(forKey: url)
+            taskLastSizes.removeValue(forKey: url)
+            taskLastUpdateTimes.removeValue(forKey: url)
+            stalledURLs.remove(url)
+            tasksHaveChanged = true
+        }
+
         for (url, var task) in currentTasks {
             guard fileManager.fileExists(atPath: url.path) else {
-                print("[DM] File for task \(task.fileName) no longer exists. Assuming completed or deleted.")
                 currentTasks.removeValue(forKey: url)
                 taskLastSizes.removeValue(forKey: url)
                 taskLastUpdateTimes.removeValue(forKey: url)
@@ -432,6 +606,13 @@ class DownloadMonitor: ObservableObject {
                 if let progress = progressInfo.progress {
                     task.progress = progress
                 }
+                if progressInfo.isFinished {
+                    task.progress = 1
+                }
+                if let displayName = progressInfo.displayFileName, displayName != task.fileName {
+                    task.fileName = displayName
+                    tasksHaveChanged = true
+                }
 
                 let lastSize = taskLastSizes[url] ?? 0
                 let lastUpdateTime = taskLastUpdateTimes[url] ?? task.startTime
@@ -448,7 +629,6 @@ class DownloadMonitor: ObservableObject {
                     taskLastSizes[url] = task.currentBytes
                     taskLastUpdateTimes[url] = now
                     if stalledURLs.remove(url) != nil {
-                        print("[DM] Task \(task.fileName) resumed after stall.")
                         tasksHaveChanged = true
                     }
                 } else {
@@ -465,25 +645,19 @@ class DownloadMonitor: ObservableObject {
             let idleFor = now.timeIntervalSince(taskLastUpdateTimes[url] ?? task.startTime)
             if idleFor >= stallTimeout {
                 if stalledURLs.insert(url).inserted {
-                    print("[DM] Task \(task.fileName) stalled after \(Int(idleFor))s with no progress. Hiding from live activity.")
                     tasksHaveChanged = true
                 }
             }
         }
 
-        let completedTasks = currentTasks.filter { $0.value.progress >= 0.999 }
-        for (url, _) in completedTasks {
-            print("[DM] Task for \(url.lastPathComponent) is complete. Removing.")
-            currentTasks.removeValue(forKey: url)
-            taskLastSizes.removeValue(forKey: url)
-            taskLastUpdateTimes.removeValue(forKey: url)
-            stalledURLs.remove(url)
-            tasksHaveChanged = true
-        }
-
-        let publishedCount = currentTasks.keys.filter { !stalledURLs.contains($0) }.count
-        if tasksHaveChanged || tasks.count != publishedCount {
-            print("[DM] Download tasks changed. Publishing update.")
+        let activeURLs = Set(currentTasks.keys.filter { !stalledURLs.contains($0) })
+        let publishedURLs = Set(tasks.map(\.fileURL))
+        let shouldPublish = DownloadMonitorPublishPolicy.shouldPublish(
+            activeFileURLs: activeURLs,
+            publishedFileURLs: publishedURLs,
+            progressChanged: tasksHaveChanged
+        )
+        if shouldPublish {
             updateTasksList()
         }
     }
@@ -516,7 +690,6 @@ class DownloadMonitor: ObservableObject {
             )
         }
 
-        print("[DM] Relaying \(fileTransferTasks.count) browser download tasks to FileDropManager.")
         guard updatedTasks != lastPublishedTasks || fileTransferTasks != lastPublishedTransferTasks else { return }
         lastPublishedTasks = updatedTasks
         lastPublishedTransferTasks = fileTransferTasks
